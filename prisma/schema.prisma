@@ -1,0 +1,149 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  FARMER
+  BUYER
+  AGRONOMIST
+  ADMIN
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String   @unique
+  phone     String?
+  password  String
+  role      Role
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Shared location fields (Farmer / Buyer / Agronomist)
+  region String?
+  town   String?
+
+  // Farmer-specific
+  farmingType String?
+  farmSize    String?
+  twoFactor   Boolean @default(false)
+  iotInterest Boolean @default(false)
+  idFrontUrl    String?
+  idBackUrl     String?
+  farmProofUrl  String?
+
+  // Buyer-specific
+  interests String[] @default([])
+
+  // Agronomist-specific
+  specialization    String?
+  experience        String?
+  institution       String?
+  certificationUrl  String?
+
+  // Admin-specific
+  position      String?
+  organization  String?
+  inviteCode    String?
+  authLetterUrl String?
+
+  // Agronomist / Admin accounts start unverified until reviewed.
+  // Farmers and buyers don't need review, so they default to true.
+  verified Boolean @default(true)
+
+  // Admin can suspend an account without deleting it.
+  suspended Boolean @default(false)
+
+  listings Listing[]
+  devices  Device[]
+  orders   Order[]  @relation("BuyerOrders")
+
+  sentMessages     Message[] @relation("SentMessages")
+  receivedMessages Message[] @relation("ReceivedMessages")
+}
+
+enum ListingStatus {
+  ACTIVE
+  SOLD_OUT
+}
+
+model Listing {
+  id          Int           @id @default(autoincrement())
+  title       String
+  category    String
+  description String
+  price       Int
+  unit        String
+  quantity    String
+  imageUrl    String?
+  status      ListingStatus @default(ACTIVE)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  farmer   User @relation(fields: [farmerId], references: [id], onDelete: Cascade)
+  farmerId Int
+
+  orders Order[]
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  DELIVERED
+  CANCELLED
+}
+
+model Order {
+  id           Int         @id @default(autoincrement())
+  quantity     Int
+  totalPrice   Int
+  status       OrderStatus @default(PENDING)
+  note         String?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  listing   Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  listingId Int
+
+  buyer   User @relation("BuyerOrders", fields: [buyerId], references: [id], onDelete: Cascade)
+  buyerId Int
+}
+
+enum DeviceType {
+  SOIL_MOISTURE
+  WEATHER_STATION
+  TEMPERATURE_HUMIDITY
+  WATER_LEVEL
+  OTHER
+}
+
+model Device {
+  id        Int        @id @default(autoincrement())
+  name      String
+  type      DeviceType
+  location  String?
+  active    Boolean    @default(true)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  farmer   User @relation(fields: [farmerId], references: [id], onDelete: Cascade)
+  farmerId Int
+}
+
+model Message {
+  id        Int      @id @default(autoincrement())
+  content   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  sender     User @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  senderId   Int
+  receiver   User @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
+  receiverId Int
+
+  @@index([senderId, receiverId])
+}
