@@ -13,8 +13,6 @@ import {
   ChevronDown,
   Clock,
   Cloud,
-  CloudRain,
-  CloudSun,
   Layout,
   LayoutDashboard,
   LogOut,
@@ -27,16 +25,12 @@ import {
   Sprout,
   Stethoscope,
   Store,
-  Sun,
-  Thermometer,
   X,
   Bot,
   Cpu,
 } from "lucide-react";
 
-import Logo from "@/components/Logo";
 import { useSession } from "@/lib/useSession";
-import WeatherWidget from "@/components/WeatherWidget";
 import DashboardSidebar from "@/components/DashboardSidebar";
 
 const STAT_ICONS: Record<string, typeof Sprout> = {
@@ -75,6 +69,7 @@ const quickActions = [
   { title: "IoT Dashboard", desc: "Monitor your sensors in real-time.", icon: Cpu, href: "/farmer/iot-dashboard" },
   { title: "Advisory articles", desc: "Read agricultural guidance from experts.", icon: BookOpen, href: "/articles" },
   { title: "AI Assistant", desc: "Get instant agricultural advice from our AI.", icon: Bot, href: "/ai-chat" },
+  { title: "Weather Dashboard", desc: "View detailed weather forecasts and insights.", icon: Cloud, href: "/weather" },
 ];
 
 const recentActivity = [
@@ -85,7 +80,6 @@ const recentActivity = [
   { name: "Buyer Amina N.", action: "sent you a message", time: "yesterday", icon: MessageSquare },
 ];
 
-// UPDATED: Added IoT Dashboard to navigation
 const navItems = [
   { label: "Dashboard", icon: LayoutDashboard, href: "/farmer", active: true },
   { label: "My Farms", icon: Sprout, href: "/farmer/farms" },
@@ -102,28 +96,6 @@ const navItems = [
   { label: "Settings", icon: Settings, href: "/settings" },
 ];
 
-type WeatherData = {
-  current_weather: {
-    temperature: number;
-    windspeed: number;
-    weathercode: number;
-  };
-  hourly: {
-    temperature_2m: number[];
-    precipitation: number[];
-    relative_humidity_2m: number[];
-  };
-};
-
-function getWeatherInfo(code: number): { icon: typeof Sun; label: string; color: string } {
-  if (code === 0) return { icon: Sun, label: "Clear sky", color: "#f59e0b" };
-  if (code === 1 || code === 2 || code === 3) return { icon: CloudSun, label: "Partly cloudy", color: "#6b7280" };
-  if (code >= 45 && code <= 48) return { icon: Cloud, label: "Foggy", color: "#9ca3af" };
-  if (code >= 51 && code <= 67) return { icon: CloudRain, label: "Rainy", color: "#3b82f6" };
-  if (code >= 80 && code <= 82) return { icon: CloudRain, label: "Rain showers", color: "#2563eb" };
-  return { icon: Cloud, label: "Cloudy", color: "#6b7280" };
-}
-
 function FarmerDashboard() {
   const router = useRouter();
   const { user, loading } = useSession("FARMER");
@@ -131,8 +103,6 @@ function FarmerDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [stats, setStats] = useState(initialStats);
-  const [weather, setWeather] = useState<WeatherData | null>(null);
-  const [weatherLoading, setWeatherLoading] = useState(true);
 
   useEffect(() => {
     if (!user) return;
@@ -151,59 +121,22 @@ function FarmerDashboard() {
       .catch(() => {});
   }, [user]);
 
-  useEffect(() => {
-    if (!user || !user.region) {
-      setWeatherLoading(false);
-      return;
-    }
-
-    const regionCoords: Record<string, { lat: number; lon: number }> = {
-      "Adamawa": { lat: 7.0, lon: 13.5 },
-      "Centre": { lat: 4.0, lon: 12.0 },
-      "East": { lat: 4.5, lon: 14.0 },
-      "Far North": { lat: 11.0, lon: 14.0 },
-      "Littoral": { lat: 4.0, lon: 9.7 },
-      "North": { lat: 9.0, lon: 13.0 },
-      "Northwest": { lat: 6.0, lon: 10.0 },
-      "West": { lat: 5.5, lon: 10.5 },
-      "South": { lat: 3.0, lon: 11.5 },
-      "Southwest": { lat: 4.5, lon: 9.2 },
-    };
-
-    const coords = regionCoords[user.region];
-    if (!coords) {
-      setWeatherLoading(false);
-      return;
-    }
-
-    fetch(`/api/weather?lat=${coords.lat}&lon=${coords.lon}`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.current_weather) {
-          setWeather(data);
-        }
-        setWeatherLoading(false);
-      })
-      .catch(() => {
-        setWeatherLoading(false);
-      });
-  }, [user]);
-
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });
     router.push("/login");
   }
 
   if (loading || !user) {
-    return <div className="dash-loading">Loading your dashboard...</div>;
+    return (
+      <div className="dash-loading">
+        <div className="dash-loading-spinner"></div>
+        <span>Loading your dashboard...</span>
+      </div>
+    );
   }
 
   const initial = user.name.charAt(0).toUpperCase();
   const firstName = user.name.split(" ")[0];
-
-  const weatherInfo = weather?.current_weather 
-    ? getWeatherInfo(weather.current_weather.weathercode)
-    : null;
 
   const hasIoTInterest = user.iotInterest || false;
 
@@ -255,21 +188,24 @@ function FarmerDashboard() {
         </header>
 
         <main className="dash-content">
+          {/* Welcome Banner */}
           <div className="dash-banner">
             <BadgeCheck size={16} />
-            You&apos;re signed in for real — but the stats and activity
-            below are still sample data until those features are built.
+            <span>
+              Welcome to your farm dashboard, <strong>{firstName}</strong>! 
+              Manage your crops, track orders, and monitor your farm's performance.
+            </span>
           </div>
 
-          <WeatherWidget />
-
+          {/* Page Header */}
           <div className="dash-page-header">
             <div>
               <h1>Welcome back, {firstName} 👋</h1>
-              <p>Here&apos;s how your farms are doing today.</p>
+              <p>Here's how your farms are doing today.</p>
             </div>
           </div>
 
+          {/* Stats Grid */}
           <div className="dash-stats-grid">
             {stats.map((s) => (
               <div className="dash-stat-card" key={s.label}>
@@ -285,6 +221,7 @@ function FarmerDashboard() {
             ))}
           </div>
 
+          {/* IoT Section - Only if user has IoT interest */}
           {hasIoTInterest && (
             <div className="dash-iot-section">
               <div className="dash-iot-header">
@@ -325,6 +262,7 @@ function FarmerDashboard() {
             </div>
           )}
 
+          {/* Split Panel - Crops & Activity */}
           <div className="dash-split">
             <div className="dash-panel">
               <div className="dash-panel-header">
@@ -365,6 +303,7 @@ function FarmerDashboard() {
             </div>
           </div>
 
+          {/* Quick Actions */}
           <div className="dash-panel-header dash-actions-header">
             <h2>Quick actions</h2>
           </div>
@@ -375,6 +314,7 @@ function FarmerDashboard() {
                   <div className="dash-action-top">
                     <div className="dash-action-icon"><a.icon size={18} /></div>
                     {a.title === "AI Assistant" && <span className="dash-ai-badge">New</span>}
+                    {a.title === "Weather Dashboard" && <span className="dash-weather-badge">☀️</span>}
                   </div>
                   <h3>{a.title}</h3>
                   <p>{a.desc}</p>
@@ -395,6 +335,31 @@ function FarmerDashboard() {
       </div>
 
       <style jsx>{`
+        /* Loading */
+        .dash-loading {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          min-height: 100vh;
+          background: #f0fdf4;
+          gap: 0.75rem;
+          color: #6b7280;
+        }
+
+        .dash-loading-spinner {
+          width: 1.5rem;
+          height: 1.5rem;
+          border: 2px solid #d1fae5;
+          border-top-color: #059669;
+          border-radius: 50%;
+          animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+
+        /* IoT Section */
         .dash-iot-section {
           background: white;
           border-radius: 16px;
@@ -423,6 +388,17 @@ function FarmerDashboard() {
         .btn-sm {
           padding: 6px 16px;
           font-size: 12px;
+          background: #059669;
+          color: white;
+          border: none;
+          border-radius: 8px;
+          cursor: pointer;
+          text-decoration: none;
+          transition: background 0.2s;
+        }
+
+        .btn-sm:hover {
+          background: #047857;
         }
 
         .dash-iot-grid {
@@ -481,6 +457,15 @@ function FarmerDashboard() {
 
         .dash-iot-link:hover {
           text-decoration: underline;
+        }
+
+        /* Weather Badge */
+        .dash-weather-badge {
+          font-size: 12px;
+          background: #dbeafe;
+          color: #3b82f6;
+          padding: 2px 8px;
+          border-radius: 9999px;
         }
 
         @media (max-width: 768px) {

@@ -1,149 +1,208 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Bell, Check, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Bell, X, Check, CheckCheck, Trash2, BellOff } from "lucide-react";
+import Link from "next/link";
+import { notificationService, Notification } from "@/lib/notificationService";
 
-interface Notification {
-  id: number;
-  title: string;
-  message: string;
-  type: "info" | "success" | "warning" | "error";
-  link?: string;
-  read: boolean;
-  createdAt: string;
+interface NotificationBellProps {
+  userId: string;
+  className?: string;
 }
 
-export default function NotificationBell() {
+export default function NotificationBell({ userId, className = "" }: NotificationBellProps) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
-    fetchNotifications();
+    // Initialize notification service
+    notificationService.initialize(userId);
+    
+    // Subscribe to notification changes
+    const unsubscribe = notificationService.subscribe((notifs) => {
+      setNotifications(notifs);
+      setUnreadCount(notifs.filter(n => !n.read).length);
+    });
+
     // Request notification permission
-    if ("Notification" in window && Notification.permission === "default") {
-      Notification.requestPermission();
-    }
-  }, []);
+    notificationService.requestPermission();
 
-  const fetchNotifications = async () => {
-    try {
-      const res = await fetch("/api/notifications");
-      if (res.ok) {
-        const data = await res.json();
-        setNotifications(data.notifications || []);
-        setUnreadCount(data.unreadCount || 0);
-      }
-    } catch (error) {
-      console.error("Failed to fetch notifications:", error);
-    } finally {
-      setLoading(false);
-    }
+    return () => unsubscribe();
+  }, [userId]);
+
+  const handleMarkAsRead = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    notificationService.markAsRead(id);
   };
 
-  const markAsRead = async (notificationId: number) => {
-    try {
-      await fetch("/api/notifications", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ notificationId }),
-      });
-      // Update local state
-      setNotifications(prev =>
-        prev.map(n =>
-          n.id === notificationId ? { ...n, read: true } : n
-        )
-      );
-      setUnreadCount(prev => Math.max(0, prev - 1));
-    } catch (error) {
-      console.error("Failed to mark notification as read:", error);
-    }
+  const handleMarkAllRead = () => {
+    notificationService.markAllAsRead();
   };
 
-  const markAllAsRead = async () => {
-    try {
-      await fetch("/api/notifications", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ markAll: true }),
-      });
-      setNotifications(prev =>
-        prev.map(n => ({ ...n, read: true }))
-      );
-      setUnreadCount(0);
-    } catch (error) {
-      console.error("Failed to mark all as read:", error);
-    }
+  const handleDelete = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    notificationService.deleteNotification(id);
   };
 
-  const getTypeColor = (type: string) => {
-    switch (type) {
-      case "success": return "bg-green-50 border-green-200";
-      case "warning": return "bg-yellow-50 border-yellow-200";
-      case "error": return "bg-red-50 border-red-200";
-      default: return "bg-blue-50 border-blue-200";
-    }
+  const handleClearAll = () => {
+    notificationService.clearAll();
+  };
+
+  const getTypeStyles = (type: string) => {
+    const styles: Record<string, { bg: string; border: string }> = {
+      success: { bg: 'bg-green-50', border: 'border-green-200' },
+      warning: { bg: 'bg-yellow-50', border: 'border-yellow-200' },
+      error: { bg: 'bg-red-50', border: 'border-red-200' },
+      info: { bg: 'bg-blue-50', border: 'border-blue-200' }
+    };
+    return styles[type] || styles.info;
+  };
+
+  const getTypeIcon = (type: string) => {
+    const icons: Record<string, string> = {
+      success: '✅',
+      warning: '⚠️',
+      error: '❌',
+      info: 'ℹ️'
+    };
+    return icons[type] || '📌';
+  };
+
+  const formatTime = (date: Date) => {
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
+
+    if (minutes < 1) return 'Just now';
+    if (minutes < 60) return `${minutes}m ago`;
+    if (hours < 24) return `${hours}h ago`;
+    if (days < 7) return `${days}d ago`;
+    return date.toLocaleDateString();
   };
 
   return (
-    <div className="notification-bell">
+    <div className={`notification-bell ${className}`}>
       <button
-        className="dash-icon-btn notification-btn"
+        className="notification-bell-btn"
         onClick={() => setIsOpen(!isOpen)}
         aria-label="Notifications"
       >
-        <Bell size={18} />
+        <Bell className="notification-bell-icon" />
         {unreadCount > 0 && (
-          <span className="notification-count">{unreadCount}</span>
+          <span className="notification-badge">{unreadCount}</span>
         )}
-        <span className="dash-dot" />
       </button>
 
       {isOpen && (
         <div className="notification-dropdown">
           <div className="notification-header">
-            <h3>Notifications</h3>
-            {unreadCount > 0 && (
-              <button onClick={markAllAsRead} className="notification-mark-all">
-                <Check size={14} /> Mark all read
+            <div>
+              <h3>Notifications</h3>
+              <span className="notification-count">
+                {unreadCount} unread
+              </span>
+            </div>
+            <div className="notification-actions">
+              {unreadCount > 0 && (
+                <button
+                  onClick={handleMarkAllRead}
+                  className="notification-action-btn"
+                  title="Mark all as read"
+                >
+                  <CheckCheck className="notification-action-icon" />
+                </button>
+              )}
+              {notifications.length > 0 && (
+                <button
+                  onClick={handleClearAll}
+                  className="notification-action-btn"
+                  title="Clear all"
+                >
+                  <Trash2 className="notification-action-icon" />
+                </button>
+              )}
+              <button
+                onClick={() => setIsOpen(false)}
+                className="notification-action-btn"
+                title="Close"
+              >
+                <X className="notification-action-icon" />
               </button>
-            )}
+            </div>
           </div>
 
           <div className="notification-list">
-            {loading ? (
-              <div className="notification-loading">Loading...</div>
-            ) : notifications.length === 0 ? (
+            {notifications.length === 0 ? (
               <div className="notification-empty">
-                <Bell size={24} />
+                <BellOff className="notification-empty-icon" />
                 <p>No notifications</p>
+                <span>You're all caught up!</span>
               </div>
             ) : (
-              notifications.map((notification) => (
-                <div
-                  key={notification.id}
-                  className={`notification-item ${!notification.read ? "notification-unread" : ""}`}
-                >
-                  <div className={`notification-item-content ${getTypeColor(notification.type)}`}>
-                    <div className="notification-item-header">
-                      <h4>{notification.title}</h4>
+              notifications.map((notification) => {
+                const styles = getTypeStyles(notification.type);
+                return (
+                  <div
+                    key={notification.id}
+                    className={`notification-item ${!notification.read ? 'notification-unread' : ''} ${styles.bg}`}
+                  >
+                    <div className="notification-item-icon">
+                      <span>{notification.icon}</span>
+                    </div>
+                    <div className="notification-item-content">
+                      <div className="notification-item-header">
+                        <span className="notification-item-title">
+                          {notification.title}
+                        </span>
+                        {!notification.read && (
+                          <span className="notification-dot"></span>
+                        )}
+                      </div>
+                      <p className="notification-item-message">
+                        {notification.message}
+                      </p>
+                      <div className="notification-item-footer">
+                        <span className="notification-item-time">
+                          {formatTime(notification.createdAt)}
+                        </span>
+                        {notification.link && (
+                          <Link
+                            href={notification.link}
+                            className="notification-item-link"
+                            onClick={() => {
+                              notificationService.markAsRead(notification.id);
+                              setIsOpen(false);
+                            }}
+                          >
+                            View →
+                          </Link>
+                        )}
+                      </div>
+                    </div>
+                    <div className="notification-item-actions">
                       {!notification.read && (
                         <button
-                          onClick={() => markAsRead(notification.id)}
+                          onClick={(e) => handleMarkAsRead(notification.id, e)}
                           className="notification-mark-btn"
+                          title="Mark as read"
                         >
-                          <Check size={14} />
+                          <Check className="notification-mark-icon" />
                         </button>
                       )}
+                      <button
+                        onClick={(e) => handleDelete(notification.id, e)}
+                        className="notification-delete-btn"
+                        title="Delete"
+                      >
+                        <X className="notification-delete-icon" />
+                      </button>
                     </div>
-                    <p>{notification.message}</p>
-                    <span className="notification-time">
-                      {new Date(notification.createdAt).toLocaleTimeString()}
-                    </span>
                   </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </div>
@@ -154,172 +213,286 @@ export default function NotificationBell() {
           position: relative;
         }
 
-        .notification-btn {
+        .notification-bell-btn {
           position: relative;
-          border: 1px solid var(--border);
-          background: white;
-          border-radius: 12px;
-          padding: 9px;
-          color: var(--green-deep);
+          padding: 0.5rem;
+          background: transparent;
+          border: none;
+          border-radius: 0.5rem;
           cursor: pointer;
-        }
-
-        .notification-count {
-          position: absolute;
-          top: -4px;
-          right: -4px;
-          background: #ef4444;
-          color: white;
-          font-size: 10px;
-          font-weight: 700;
-          min-width: 18px;
-          height: 18px;
-          border-radius: 50%;
+          transition: background 0.2s;
           display: flex;
           align-items: center;
           justify-content: center;
-          padding: 0 4px;
         }
 
-        .dash-dot {
-          display: none;
+        .notification-bell-btn:hover {
+          background: #f3f4f6;
+        }
+
+        .notification-bell-icon {
+          width: 1.25rem;
+          height: 1.25rem;
+          color: #6b7280;
+        }
+
+        .notification-badge {
+          position: absolute;
+          top: -0.25rem;
+          right: -0.25rem;
+          background: #ef4444;
+          color: white;
+          font-size: 0.6rem;
+          font-weight: 600;
+          min-width: 1.25rem;
+          height: 1.25rem;
+          border-radius: 9999px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0 0.25rem;
+          animation: pulse-badge 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse-badge {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.05); }
         }
 
         .notification-dropdown {
           position: absolute;
+          top: 100%;
           right: 0;
-          top: calc(100% + 8px);
-          width: 380px;
-          max-height: 480px;
+          width: 24rem;
+          max-height: 32rem;
           background: white;
-          border-radius: 16px;
-          box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
-          border: 1px solid var(--border);
-          z-index: 50;
-          overflow: hidden;
+          border-radius: 0.75rem;
+          box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+          border: 1px solid #e5e7eb;
+          z-index: 1000;
+          margin-top: 0.5rem;
           display: flex;
           flex-direction: column;
+          overflow: hidden;
         }
 
         .notification-header {
           display: flex;
-          align-items: center;
           justify-content: space-between;
-          padding: 16px 20px;
-          border-bottom: 1px solid var(--border);
+          align-items: center;
+          padding: 0.75rem 1rem;
+          border-bottom: 1px solid #f3f4f6;
           flex-shrink: 0;
         }
 
         .notification-header h3 {
-          font-size: 16px;
-          font-weight: 700;
-          color: var(--green-deep);
-          margin: 0;
+          font-size: 0.875rem;
+          font-weight: 600;
+          color: #1f2937;
         }
 
-        .notification-mark-all {
+        .notification-count {
+          font-size: 0.625rem;
+          color: #6b7280;
+          margin-left: 0.5rem;
+        }
+
+        .notification-actions {
           display: flex;
           align-items: center;
-          gap: 4px;
-          background: none;
-          border: none;
-          color: #059669;
-          font-size: 12px;
-          font-weight: 600;
-          cursor: pointer;
+          gap: 0.25rem;
         }
 
-        .notification-mark-all:hover {
-          color: #047857;
+        .notification-action-btn {
+          padding: 0.25rem;
+          background: transparent;
+          border: none;
+          border-radius: 0.25rem;
+          cursor: pointer;
+          transition: background 0.2s;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #6b7280;
+        }
+
+        .notification-action-btn:hover {
+          background: #f3f4f6;
+          color: #374151;
+        }
+
+        .notification-action-icon {
+          width: 1rem;
+          height: 1rem;
         }
 
         .notification-list {
           flex: 1;
           overflow-y: auto;
-          padding: 8px;
-        }
-
-        .notification-loading {
-          padding: 30px 20px;
-          text-align: center;
-          color: #6b7280;
+          padding: 0.5rem;
         }
 
         .notification-empty {
-          padding: 40px 20px;
-          text-align: center;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 0.25rem;
+          padding: 2rem 0;
           color: #9ca3af;
         }
 
+        .notification-empty-icon {
+          width: 2.5rem;
+          height: 2.5rem;
+          color: #d1d5db;
+        }
+
         .notification-empty p {
-          margin: 8px 0 0 0;
+          font-size: 0.875rem;
+          font-weight: 500;
+          color: #6b7280;
+        }
+
+        .notification-empty span {
+          font-size: 0.75rem;
         }
 
         .notification-item {
-          margin-bottom: 6px;
+          display: flex;
+          gap: 0.75rem;
+          padding: 0.75rem;
+          border-radius: 0.5rem;
+          margin-bottom: 0.25rem;
+          transition: background 0.2s;
+          border: 1px solid transparent;
+        }
+
+        .notification-item:hover {
+          background: #f9fafb;
         }
 
         .notification-unread {
-          border-left: 3px solid #059669;
-          border-radius: 0 8px 8px 0;
+          border-color: #e5e7eb;
+        }
+
+        .notification-unread .notification-item-title {
+          font-weight: 600;
+        }
+
+        .notification-item-icon {
+          flex-shrink: 0;
+          font-size: 1.25rem;
         }
 
         .notification-item-content {
-          padding: 12px 14px;
-          border-radius: 8px;
-          border: 1px solid transparent;
+          flex: 1;
+          min-width: 0;
         }
 
         .notification-item-header {
           display: flex;
-          justify-content: space-between;
-          align-items: flex-start;
-          gap: 8px;
+          align-items: center;
+          gap: 0.5rem;
         }
 
-        .notification-item-header h4 {
-          font-size: 13px;
-          font-weight: 600;
+        .notification-item-title {
+          font-size: 0.75rem;
+          font-weight: 500;
           color: #1f2937;
-          margin: 0;
         }
 
-        .notification-item-content p {
-          font-size: 12px;
+        .notification-dot {
+          width: 0.375rem;
+          height: 0.375rem;
+          background: #3b82f6;
+          border-radius: 50%;
+          flex-shrink: 0;
+          animation: pulse-dot 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse-dot {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.4; }
+        }
+
+        .notification-item-message {
+          font-size: 0.7rem;
           color: #6b7280;
-          margin: 4px 0 6px 0;
-          line-height: 1.5;
+          margin: 0.125rem 0 0.25rem 0;
+          line-height: 1.4;
         }
 
-        .notification-time {
-          font-size: 10px;
+        .notification-item-footer {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+
+        .notification-item-time {
+          font-size: 0.55rem;
           color: #9ca3af;
         }
 
-        .notification-mark-btn {
+        .notification-item-link {
+          font-size: 0.6rem;
+          color: #10a37f;
+          text-decoration: none;
+          font-weight: 500;
+        }
+
+        .notification-item-link:hover {
+          text-decoration: underline;
+        }
+
+        .notification-item-actions {
+          display: flex;
+          flex-direction: column;
+          gap: 0.125rem;
           flex-shrink: 0;
-          width: 22px;
-          height: 22px;
-          border-radius: 50%;
+        }
+
+        .notification-mark-btn,
+        .notification-delete-btn {
+          padding: 0.125rem;
+          background: transparent;
           border: none;
-          background: #059669;
-          color: white;
+          border-radius: 0.25rem;
+          cursor: pointer;
+          transition: background 0.2s;
           display: flex;
           align-items: center;
           justify-content: center;
-          cursor: pointer;
-          transition: background 0.2s;
+          color: #9ca3af;
         }
 
         .notification-mark-btn:hover {
-          background: #047857;
+          background: #d1fae5;
+          color: #10a37f;
         }
 
+        .notification-delete-btn:hover {
+          background: #fef2f2;
+          color: #ef4444;
+        }
+
+        .notification-mark-icon,
+        .notification-delete-icon {
+          width: 0.75rem;
+          height: 0.75rem;
+        }
+
+        /* Responsive */
         @media (max-width: 640px) {
           .notification-dropdown {
-            width: calc(100vw - 32px);
-            right: -16px;
-            max-height: 400px;
+            width: 20rem;
+            right: -4rem;
+          }
+        }
+
+        @media (max-width: 480px) {
+          .notification-dropdown {
+            width: 18rem;
+            right: -6rem;
           }
         }
       `}</style>

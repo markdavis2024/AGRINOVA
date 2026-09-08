@@ -90,7 +90,7 @@ export default function WeatherWidget() {
     };
 
     fetchWeather();
-    const interval = setInterval(fetchWeather, 15 * 60 * 1000);
+    const interval = setInterval(fetchWeather, 30 * 60 * 1000);
     return () => clearInterval(interval);
   }, []);
 
@@ -134,7 +134,7 @@ export default function WeatherWidget() {
   const hourlyForecast = weather.hourly?.temperature_2m?.slice(0, 6) || [];
 
   return (
-    <div className="weather-widget">
+    <div className="weather-widget-container">
       <div className={`weather-card ${isDay ? 'weather-card-day' : 'weather-card-night'}`}>
         {/* Decorative particles */}
         <div className="weather-bg">
@@ -161,7 +161,7 @@ export default function WeatherWidget() {
             </div>
           </div>
 
-          {/* Main Weather - Centered */}
+          {/* Main Weather */}
           <div className="weather-main">
             <div className="weather-left">
               <div className="weather-icon-wrapper">
@@ -194,68 +194,68 @@ export default function WeatherWidget() {
                   <div className="weather-detail-label">Humidity</div>
                 </div>
               </div>
+              <div className="weather-detail">
+                <Sunrise className="weather-detail-icon" />
+                <div>
+                  <div className="weather-detail-value">06:30</div>
+                  <div className="weather-detail-label">Sunrise</div>
+                </div>
+              </div>
+              <div className="weather-detail">
+                <Sunset className="weather-detail-icon" />
+                <div>
+                  <div className="weather-detail-value">18:30</div>
+                  <div className="weather-detail-label">Sunset</div>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Bottom Row - Sunrise/Sunset & Hourly */}
-          <div className="weather-bottom">
-            <div className="weather-sun-times">
-              <div className="weather-sun-time">
-                <Sunrise className="weather-sun-icon" />
-                <div>
-                  <div className="weather-sun-label">Sunrise</div>
-                  <div className="weather-sun-value">06:30</div>
-                </div>
-              </div>
-              <div className="weather-sun-time">
-                <Sunset className="weather-sun-icon" />
-                <div>
-                  <div className="weather-sun-label">Sunset</div>
-                  <div className="weather-sun-value">18:30</div>
-                </div>
+          {/* Hourly Forecast */}
+          {hourlyForecast.length > 0 && (
+            <div className="weather-hourly">
+              <div className="weather-hourly-title">Hourly Forecast</div>
+              <div className="weather-hourly-grid">
+                {hourlyForecast.map((temp, i) => {
+                  const forecastHour = (hour + i) % 24;
+                  const isNow = i === 0;
+                  return (
+                    <div
+                      key={i}
+                      className={`weather-hourly-item ${isNow ? 'weather-hourly-item-now' : ''}`}
+                    >
+                      <span className="weather-hourly-time">
+                        {isNow ? 'Now' : `${forecastHour}:00`}
+                      </span>
+                      <span className="weather-hourly-temp">{Math.round(temp)}°</span>
+                      <span className="weather-hourly-icon">
+                        {forecastHour > 6 && forecastHour < 18 ? '☀️' : '🌙'}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
-
-            {/* Hourly Forecast */}
-            {hourlyForecast.length > 0 && (
-              <div className="weather-hourly">
-                <div className="weather-hourly-title">Hourly Forecast</div>
-                <div className="weather-hourly-grid">
-                  {hourlyForecast.map((temp, i) => {
-                    const forecastHour = (hour + i) % 24;
-                    const isNow = i === 0;
-                    return (
-                      <div
-                        key={i}
-                        className={`weather-hourly-item ${isNow ? 'weather-hourly-item-now' : ''}`}
-                      >
-                        <span className="weather-hourly-time">
-                          {isNow ? 'Now' : `${forecastHour}:00`}
-                        </span>
-                        <span className="weather-hourly-temp">{Math.round(temp)}°</span>
-                        <span className="weather-hourly-icon">
-                          {forecastHour > 6 && forecastHour < 18 ? '☀️' : '🌙'}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
+          )}
         </div>
       </div>
 
       <style jsx>{`
-        .weather-widget {
+        .weather-widget-container {
           width: 100%;
           margin-bottom: 1.5rem;
-          animation: fadeInUp 0.6s ease-out;
+          position: relative;
+          display: block;
+          clear: both;
         }
 
         @keyframes fadeInUp {
           from { opacity: 0; transform: translateY(20px); }
           to { opacity: 1; transform: translateY(0); }
+        }
+
+        .weather-widget-container {
+          animation: fadeInUp 0.6s ease-out;
         }
 
         /* Skeleton */
@@ -264,6 +264,7 @@ export default function WeatherWidget() {
           border-radius: 1rem;
           padding: 1.5rem;
           border: 1px solid #e5e7eb;
+          width: 100%;
         }
 
         .weather-skeleton-content {
@@ -304,6 +305,7 @@ export default function WeatherWidget() {
           border-radius: 1rem;
           padding: 1.5rem;
           border: 1px solid #f3f4f6;
+          width: 100%;
         }
 
         .weather-error-content {
@@ -335,6 +337,7 @@ export default function WeatherWidget() {
           overflow: hidden;
           box-shadow: 0 2px 12px rgba(0,0,0,0.06);
           border: 1px solid rgba(255,255,255,0.1);
+          width: 100%;
         }
 
         .weather-card-day {
@@ -388,7 +391,7 @@ export default function WeatherWidget() {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          margin-bottom: 1rem;
+          margin-bottom: 0.75rem;
         }
 
         .weather-location {
@@ -444,7 +447,7 @@ export default function WeatherWidget() {
           display: flex;
           align-items: center;
           gap: 1.5rem;
-          margin-bottom: 1rem;
+          margin-bottom: 0.75rem;
         }
 
         .weather-left {
@@ -516,8 +519,8 @@ export default function WeatherWidget() {
         }
 
         .weather-right {
-          display: flex;
-          flex-direction: column;
+          display: grid;
+          grid-template-columns: 1fr 1fr;
           gap: 0.5rem;
           flex-shrink: 0;
         }
@@ -551,50 +554,10 @@ export default function WeatherWidget() {
           color: rgba(255,255,255,0.6);
         }
 
-        /* Bottom */
-        .weather-bottom {
-          display: flex;
-          align-items: center;
-          gap: 1.5rem;
-          padding-top: 0.75rem;
-          border-top: 1px solid rgba(255,255,255,0.1);
-        }
-
-        .weather-sun-times {
-          display: flex;
-          gap: 1rem;
-          flex-shrink: 0;
-        }
-
-        .weather-sun-time {
-          display: flex;
-          align-items: center;
-          gap: 0.4rem;
-        }
-
-        .weather-sun-icon {
-          width: 1rem;
-          height: 1rem;
-          color: rgba(255,255,255,0.7);
-        }
-
-        .weather-sun-label {
-          font-size: 0.55rem;
-          color: rgba(255,255,255,0.6);
-          text-transform: uppercase;
-          letter-spacing: 0.03em;
-        }
-
-        .weather-sun-value {
-          font-size: 0.75rem;
-          font-weight: 600;
-          color: white;
-        }
-
         /* Hourly Forecast */
         .weather-hourly {
-          flex: 1;
-          min-width: 0;
+          padding-top: 0.75rem;
+          border-top: 1px solid rgba(255,255,255,0.1);
         }
 
         .weather-hourly-title {
@@ -663,45 +626,13 @@ export default function WeatherWidget() {
             gap: 0.75rem;
           }
 
-          .weather-left {
-            flex-shrink: 0;
-          }
-
-          .weather-icon-wrapper {
-            width: 3.5rem;
-            height: 3.5rem;
-          }
-
-          .weather-icon-wrapper svg {
-            width: 1.75rem;
-            height: 1.75rem;
+          .weather-right {
+            grid-template-columns: 1fr 1fr;
+            width: 100%;
           }
 
           .weather-temp {
             font-size: 2rem;
-          }
-
-          .weather-right {
-            flex-direction: row;
-            width: 100%;
-          }
-
-          .weather-detail {
-            flex: 1;
-          }
-
-          .weather-bottom {
-            flex-direction: column;
-            gap: 0.75rem;
-          }
-
-          .weather-sun-times {
-            width: 100%;
-            justify-content: space-around;
-          }
-
-          .weather-hourly {
-            width: 100%;
           }
 
           .weather-hourly-grid {
@@ -717,8 +648,8 @@ export default function WeatherWidget() {
           }
 
           .weather-right {
-            flex-direction: row;
-            justify-content: center;
+            grid-template-columns: 1fr 1fr;
+            width: 100%;
           }
 
           .weather-detail {
@@ -737,6 +668,16 @@ export default function WeatherWidget() {
             flex-direction: column;
             align-items: flex-start;
             gap: 0.3rem;
+          }
+
+          .weather-icon-wrapper {
+            width: 3.5rem;
+            height: 3.5rem;
+          }
+
+          .weather-icon-wrapper svg {
+            width: 1.75rem;
+            height: 1.75rem;
           }
         }
       `}</style>
