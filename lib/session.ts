@@ -1,78 +1,65 @@
+import "server-only";
+
 import { cookies } from "next/headers";
 import { SignJWT, jwtVerify } from "jose";
-import type { Role } from "@prisma/client";
 
-const COOKIE_NAME = "agrinova_session";
-const SESSION_DURATION = "7d";
+const secret = new TextEncoder().encode(process.env.JWT_SECRET || "default-secret-key-change-this-in-production");
 
-export type SessionPayload = {
-  userId: number;
-  role: Role;
-  name: string;
+export interface SessionUser {
+  id: string;
   email: string;
-};
-
-function getSecretKey() {
-  const secret = process.env.AUTH_SECRET;
-
-  if (!secret) {
-    throw new Error(
-      "AUTH_SECRET is not set. Add a long random string to your .env file, e.g. AUTH_SECRET=some-long-random-string"
-    );
-  }
-
-  return new TextEncoder().encode(secret);
+  name: string | null;
+  role: string;
 }
 
-export async function createSession(payload: SessionPayload) {
-  const token = await new SignJWT({ ...payload })
-    .setProtectedHeader({ alg: "HS256" })
-    .setIssuedAt()
-    .setExpirationTime(SESSION_DURATION)
-    .sign(getSecretKey());
-
-  const cookieStore = await cookies();
-
-  cookieStore.set(COOKIE_NAME, token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 7, // 7 days
-  });
+export interface Session {
+  user: SessionUser;
+  expires: string;
 }
 
-export async function getSession(): Promise<SessionPayload | null> {
-  const cookieStore = await cookies();
-  const token = cookieStore.get(COOKIE_NAME)?.value;
-
-  if (!token) return null;
-
+export async function getSession(): Promise<Session | null> {
   try {
-    const { payload } = await jwtVerify(token, getSecretKey());
-    return payload as unknown as SessionPayload;
-  } catch {
+    const cookieStore = await cookies();
+    const token = cookieStore.get("auth_token")?.value;
+
+    if (!token) {
+      return null;
+    }
+
+    const verified = await jwtVerify(token, secret);
+    
+    if (!verified.payload.user) {
+      return null;
+    }
+
+    const user = verified.payload.user as any;
+    
+    return {
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name || null,
+        role: user.role,
+      },
+      expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+    };
+  } catch (error) {
+    console.error("Session error:", error);
     return null;
   }
 }
 
-export async function clearSession() {
-  const cookieStore = await cookies();
-  cookieStore.delete(COOKIE_NAME);
+export async function createSession(user: SessionUser): Promise<string> {
+  const token = await new SignJWT({ user })
+    .setProtectedHeader({ alg: "HS256" })
+    .setExpirationTime("7d")
+    .setIssuedAt()
+    .sign(secret);
+
+  return token;
 }
 
-/** Maps a role to the dashboard it should land on after login. */
-export function dashboardPathForRole(role: Role): string {
-  switch (role) {
-    case "FARMER":
-      return "/farmer";
-    case "BUYER":
-      return "/buyer";
-    case "AGRONOMIST":
-      return "/agronomist";
-    case "ADMIN":
-      return "/admin";
-    default:
-      return "/login";
-  }
+export async function destroySession() {
+  const cookieStore = await cookies();
+  cookieStore.delete("auth_token");
 }

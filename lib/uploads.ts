@@ -1,48 +1,105 @@
-import { mkdir, writeFile } from "fs/promises";
+import { writeFile, mkdir } from "fs/promises";
 import path from "path";
-import { randomUUID } from "crypto";
+import sharp from "sharp";
 
-const UPLOAD_ROOT = path.join(process.cwd(), "public", "uploads");
+export class UploadError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "UploadError";
+  }
+}
 
-const ALLOWED_TYPES = new Set([
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+const ALLOWED_TYPES = [
   "image/jpeg",
   "image/png",
   "image/webp",
+  "image/heic",
+  "image/heif",
   "application/pdf",
-]);
+  "audio/webm",
+  "audio/mp3",
+  "audio/mpeg",
+  "audio/ogg",
+  "audio/wav",
+];
 
-const MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
+// Profile photo settings
+const PROFILE_MAX_WIDTH = 500;
+const PROFILE_MAX_HEIGHT = 500;
+const PROFILE_QUALITY = 80;
 
-export class UploadError extends Error {}
+export async function saveUpload(
+  file: File,
+  folder: string,
+  options?: { resize?: boolean; maxWidth?: number; maxHeight?: number }
+): Promise<string> {
+  try {
+    if (!file || !file.name) {
+      throw new UploadError("No file provided.");
+    }
 
-/**
- * Saves an uploaded File to public/uploads/<folder>/ with a random
- * filename and returns the public URL to store on the User row.
- *
- * NOTE: this stores files on local disk, which works for local dev
- * and a single-server deployment but not for serverless platforms
- * with an ephemeral filesystem (e.g. Vercel). Swap this for S3 /
- * Supabase Storage / Cloudinary before deploying there.
- */
-export async function saveUpload(file: File, folder: string): Promise<string> {
-  if (!ALLOWED_TYPES.has(file.type)) {
-    throw new UploadError(
-      "Only JPG, PNG, WEBP or PDF files are accepted."
-    );
+    if (file.size > MAX_FILE_SIZE) {
+      throw new UploadError(`File size exceeds ${MAX_FILE_SIZE / 1024 / 1024}MB limit.`);
+    }
+
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      throw new UploadError("Only JPG, PNG, WebP, PDF, and audio files are allowed.");
+    }
+
+    const timestamp = Date.now();
+    const random = Math.random().toString(36).substring(2, 10);
+    const extension = file.name.split(".").pop() ||
+      (file.type.startsWith("audio/") ? "webm" : "jpg");
+    let filename = `${timestamp}-${random}.${extension}`;
+
+    const uploadDir = path.join(process.cwd(), "public", "uploads", folder);
+    await mkdir(uploadDir, { recursive: true });
+
+    const filePath = path.join(uploadDir, filename);
+    const bytes = await file.arrayBuffer();
+    let buffer = Buffer.from(bytes);
+
+    // Handle image resizing for profile photos
+    if (
+      folder === "profiles" &&
+      file.type.startsWith("image/") &&
+      options?.resize !== false
+    ) {
+      try {
+        const maxWidth = options?.maxWidth || PROFILE_MAX_WIDTH;
+        const maxHeight = options?.maxHeight || PROFILE_MAX_HEIGHT;
+
+        const image = sharp(buffer);
+        const metadata = await image.metadata();
+
+        if (
+          (metadata.width && metadata.width > maxWidth) ||
+          (metadata.height && metadata.height > maxHeight)
+        ) {
+          buffer = await image
+            .resize(maxWidth, maxHeight, {
+              fit: "inside",
+              withoutEnlargement: true,
+            })
+            .jpeg({ quality: PROFILE_QUALITY })
+            .toBuffer();
+
+          filename = `${timestamp}-${random}.jpg`;
+        }
+      } catch (sharpError) {
+        console.warn("Image processing failed, using original:", sharpError);
+      }
+    }
+
+    await writeFile(path.join(uploadDir, filename), buffer);
+
+    return `/uploads/${folder}/${filename}`;
+  } catch (error) {
+    if (error instanceof UploadError) {
+      throw error;
+    }
+    console.error("Upload error:", error);
+    throw new UploadError("Failed to save file. Please try again.");
   }
-
-  if (file.size > MAX_SIZE_BYTES) {
-    throw new UploadError("Files must be under 5MB.");
-  }
-
-  const extension = file.type === "application/pdf" ? "pdf" : file.type.split("/")[1];
-  const filename = `${randomUUID()}.${extension}`;
-  const folderPath = path.join(UPLOAD_ROOT, folder);
-
-  await mkdir(folderPath, { recursive: true });
-
-  const bytes = Buffer.from(await file.arrayBuffer());
-  await writeFile(path.join(folderPath, filename), bytes);
-
-  return `/uploads/${folder}/${filename}`;
 }

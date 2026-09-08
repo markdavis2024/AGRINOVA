@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -26,19 +26,22 @@ import {
 import Logo from "../../components/Logo";
 import { useSession } from "../../lib/useSession";
 
-/* ============================================================
-   Sample data — the dashboard shell is fully built, but every
-   number here is placeholder content until it's wired to
-   PostgreSQL/Prisma.
-============================================================ */
+const STAT_ICONS: Record<string, typeof Users> = {
+  Users,
+  MessageCircle,
+  Calendar,
+  Stethoscope,
+  BookOpen,
+  Award,
+};
 
-const stats = [
-  { label: "Assigned farmers", value: "24", change: "+3 this month", icon: Users, tone: "green" },
-  { label: "Pending questions", value: "7", change: "Needs your reply", icon: MessageCircle, tone: "alert" },
-  { label: "Consultations", value: "11", change: "This month", icon: Calendar, tone: "sky" },
-  { label: "Diagnosis requests", value: "4", change: "2 awaiting review", icon: Stethoscope, tone: "yellow" },
-  { label: "Advisory articles", value: "6", change: "Published so far", icon: BookOpen, tone: "green" },
-  { label: "Credential status", value: "Pending", change: "Awaiting admin review", icon: Award, tone: "alert" },
+const initialStats = [
+  { key: "conversations", label: "Conversations", value: "—", change: "Loading...", icon: Users, tone: "green" },
+  { key: "unread", label: "Pending questions", value: "—", change: "Loading...", icon: MessageCircle, tone: "alert" },
+  { key: "consultations", label: "Consultations", value: "—", change: "Loading...", icon: Calendar, tone: "sky" },
+  { key: "diagnosis", label: "Diagnosis requests", value: "—", change: "Loading...", icon: Stethoscope, tone: "yellow" },
+  { key: "articles", label: "Advisory articles", value: "—", change: "Loading...", icon: BookOpen, tone: "green" },
+  { key: "credential", label: "Credential status", value: "—", change: "Loading...", icon: Award, tone: "alert" },
 ];
 
 const topicBreakdown = [
@@ -72,7 +75,7 @@ const navItems = [
   { label: "Consultations", icon: Calendar },
   { label: "Diagnosis", icon: Stethoscope },
   { label: "Articles", icon: BookOpen },
-  { label: "Settings", icon: Settings },
+  { label: "Settings", icon: Settings, href: "/settings" },
 ];
 
 function AgronomistDashboard() {
@@ -81,6 +84,24 @@ function AgronomistDashboard() {
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [stats, setStats] = useState(initialStats);
+
+  useEffect(() => {
+    if (!user) return;
+    fetch("/api/stats")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.stats) {
+          setStats(
+            data.stats.map((s: { icon: string; [k: string]: unknown }) => ({
+              ...s,
+              icon: STAT_ICONS[s.icon] ?? Users,
+            }))
+          );
+        }
+      })
+      .catch(() => {});
+  }, [user]);
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });

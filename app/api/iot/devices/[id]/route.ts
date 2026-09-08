@@ -2,68 +2,109 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 
-async function loadOwnedDevice(id: string, farmerId: number) {
-  const deviceId = Number(id);
-  if (!Number.isInteger(deviceId)) return null;
-
-  const device = await prisma.device.findUnique({ where: { id: deviceId } });
-  if (!device || device.farmerId !== farmerId) return null;
-
-  return device;
-}
-
 export async function PATCH(
   request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
-  const session = await getSession();
+  try {
+    const session = await getSession();
 
-  if (!session || session.role !== "FARMER") {
-    return NextResponse.json({ error: "Not authorized." }, { status: 403 });
-  }
+    if (!session || session.role !== "FARMER") {
+      return NextResponse.json(
+        { error: "Not authorized." },
+        { status: 403 }
+      );
+    }
 
-  const { id } = await params;
-  const device = await loadOwnedDevice(id, session.userId);
+    const deviceId = parseInt(params.id);
+    const body = await request.json().catch(() => ({}));
+    const { active, name, location, minThreshold, maxThreshold, alertEnabled } = body;
 
-  if (!device) {
-    return NextResponse.json({ error: "Device not found." }, { status: 404 });
-  }
+    // Verify device belongs to user
+    const existingDevice = await prisma.device.findFirst({
+      where: {
+        id: deviceId,
+        farmerId: session.userId,
+      },
+    });
 
-  const body = await request.json().catch(() => ({}));
+    if (!existingDevice) {
+      return NextResponse.json(
+        { error: "Device not found." },
+        { status: 404 }
+      );
+    }
 
-  if (typeof body.active !== "boolean") {
+    const updatedDevice = await prisma.device.update({
+      where: { id: deviceId },
+      data: {
+        active: active !== undefined ? active : existingDevice.active,
+        name: name || existingDevice.name,
+        location: location !== undefined ? location : existingDevice.location,
+        minThreshold: minThreshold !== undefined ? minThreshold : existingDevice.minThreshold,
+        maxThreshold: maxThreshold !== undefined ? maxThreshold : existingDevice.maxThreshold,
+        alertEnabled: alertEnabled !== undefined ? alertEnabled : existingDevice.alertEnabled,
+      },
+    });
+
+    return NextResponse.json({
+      success: true,
+      device: updatedDevice,
+    });
+  } catch (error) {
+    console.error("IoT Device PATCH error:", error);
     return NextResponse.json(
-      { error: "active must be true or false." },
-      { status: 400 }
+      { error: "Failed to update device." },
+      { status: 500 }
     );
   }
-
-  const updated = await prisma.device.update({
-    where: { id: device.id },
-    data: { active: body.active },
-  });
-
-  return NextResponse.json({ success: true, device: updated });
 }
 
 export async function DELETE(
-  _request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  request: Request,
+  { params }: { params: { id: string } }
 ) {
-  const session = await getSession();
+  try {
+    const session = await getSession();
 
-  if (!session || session.role !== "FARMER") {
-    return NextResponse.json({ error: "Not authorized." }, { status: 403 });
+    if (!session || session.role !== "FARMER") {
+      return NextResponse.json(
+        { error: "Not authorized." },
+        { status: 403 }
+      );
+    }
+
+    const deviceId = parseInt(params.id);
+
+    // Verify device belongs to user
+    const existingDevice = await prisma.device.findFirst({
+      where: {
+        id: deviceId,
+        farmerId: session.userId,
+      },
+    });
+
+    if (!existingDevice) {
+      return NextResponse.json(
+        { error: "Device not found." },
+        { status: 404 }
+      );
+    }
+
+    // Delete device (cascade will delete readings and alerts)
+    await prisma.device.delete({
+      where: { id: deviceId },
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: "Device deleted successfully.",
+    });
+  } catch (error) {
+    console.error("IoT Device DELETE error:", error);
+    return NextResponse.json(
+      { error: "Failed to delete device." },
+      { status: 500 }
+    );
   }
-
-  const { id } = await params;
-  const device = await loadOwnedDevice(id, session.userId);
-
-  if (!device) {
-    return NextResponse.json({ error: "Device not found." }, { status: 404 });
-  }
-
-  await prisma.device.delete({ where: { id: device.id } });
-
-  return NextResponse.json({ success: true });
 }

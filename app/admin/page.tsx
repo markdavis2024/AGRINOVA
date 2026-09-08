@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -29,19 +29,22 @@ import {
 import Logo from "../../components/Logo";
 import { useSession } from "../../lib/useSession";
 
-/* ============================================================
-   Sample data — the dashboard shell is fully built, but every
-   number here is placeholder content until it's wired to
-   PostgreSQL/Prisma. Swap these for real queries next.
-============================================================ */
+const STAT_ICONS: Record<string, typeof Users> = {
+  Users,
+  Sprout,
+  ShoppingCart,
+  Wheat,
+  FileCheck2,
+  Store,
+};
 
-const stats = [
-  { label: "Total users", value: "1,284", change: "+12% this month", icon: Users, tone: "green" },
-  { label: "Farmers", value: "742", change: "+8% this month", icon: Sprout, tone: "green" },
-  { label: "Buyers", value: "398", change: "+15% this month", icon: ShoppingCart, tone: "sky" },
-  { label: "Agronomists", value: "56", change: "+3% this month", icon: Wheat, tone: "yellow" },
-  { label: "Pending verifications", value: "27", change: "Needs review", icon: FileCheck2, tone: "alert" },
-  { label: "Marketplace listings", value: "512", change: "+21% this month", icon: Store, tone: "sky" },
+const initialStats = [
+  { key: "total", label: "Total users", value: "—", change: "Loading...", icon: Users, tone: "green" },
+  { key: "farmers", label: "Farmers", value: "—", change: "Loading...", icon: Sprout, tone: "green" },
+  { key: "buyers", label: "Buyers", value: "—", change: "Loading...", icon: ShoppingCart, tone: "sky" },
+  { key: "agronomists", label: "Agronomists", value: "—", change: "Loading...", icon: Wheat, tone: "yellow" },
+  { key: "pending", label: "Pending verifications", value: "—", change: "Loading...", icon: FileCheck2, tone: "alert" },
+  { key: "listings", label: "Marketplace listings", value: "—", change: "Loading...", icon: Store, tone: "sky" },
 ];
 
 const roleBreakdown = [
@@ -56,8 +59,8 @@ const quickActions = [
   { title: "Verify documents", desc: "Review farmer and agronomist ID / authorization uploads.", icon: FileCheck2, href: "/admin/verifications" },
   { title: "Marketplace moderation", desc: "Approve, flag or remove marketplace listings.", icon: Store },
   { title: "IoT devices", desc: "Monitor connected sensors across registered farms.", icon: Activity },
-  { title: "Reports & analytics", desc: "Platform-wide usage and growth reports.", icon: BarChart3 },
-  { title: "Platform settings", desc: "Roles, permissions, branding and notifications.", icon: Settings },
+  { title: "Reports & analytics", desc: "Platform-wide usage and growth reports.", icon: BarChart3, href: "/admin/reports" },
+  { title: "Platform settings", desc: "Site info, registrations, verification, maintenance mode.", icon: Settings, href: "/admin/settings" },
 ];
 
 const recentActivity = [
@@ -74,8 +77,8 @@ const navItems = [
   { label: "Verifications", icon: FileCheck2, href: "/admin/verifications" },
   { label: "Marketplace", icon: Store },
   { label: "IoT Devices", icon: Activity },
-  { label: "Reports", icon: BarChart3 },
-  { label: "Settings", icon: Settings },
+  { label: "Reports", icon: BarChart3, href: "/admin/reports" },
+  { label: "Settings", icon: Settings, href: "/settings" },
 ];
 
 export default function AdminHomePage() {
@@ -84,6 +87,24 @@ export default function AdminHomePage() {
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [stats, setStats] = useState(initialStats);
+
+  useEffect(() => {
+    if (!user) return;
+    fetch("/api/stats")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.stats) {
+          setStats(
+            data.stats.map((s: { icon: string; [k: string]: unknown }) => ({
+              ...s,
+              icon: STAT_ICONS[s.icon] ?? Store,
+            }))
+          );
+        }
+      })
+      .catch(() => {});
+  }, [user]);
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -141,13 +162,20 @@ export default function AdminHomePage() {
 
           <span className="dash-nav-label">Platform</span>
 
-          {navItems.slice(4).map((item) => (
-            <button key={item.label} className="dash-nav-item">
-              <item.icon size={16} />
-              {item.label}
-              <span className="dash-soon">Soon</span>
-            </button>
-          ))}
+          {navItems.slice(4).map((item) =>
+            item.href ? (
+              <Link key={item.label} href={item.href} className="dash-nav-item">
+                <item.icon size={16} />
+                {item.label}
+              </Link>
+            ) : (
+              <button key={item.label} className="dash-nav-item">
+                <item.icon size={16} />
+                {item.label}
+                <span className="dash-soon">Soon</span>
+              </button>
+            )
+          )}
         </nav>
 
         <div className="dash-sidebar-bottom">

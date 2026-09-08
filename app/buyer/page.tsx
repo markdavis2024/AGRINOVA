@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -27,19 +27,22 @@ import {
 import Logo from "../../components/Logo";
 import { useSession } from "../../lib/useSession";
 
-/* ============================================================
-   Sample data — the dashboard shell is fully built, but every
-   number here is placeholder content until it's wired to
-   PostgreSQL/Prisma.
-============================================================ */
+const STAT_ICONS: Record<string, typeof Heart> = {
+  Package,
+  Truck,
+  Heart,
+  Banknote,
+  MessageSquare,
+  Store,
+};
 
-const stats = [
-  { label: "Orders placed", value: "16", change: "+3 this month", icon: Package, tone: "green" },
-  { label: "Orders in transit", value: "2", change: "Arriving this week", icon: Truck, tone: "sky" },
-  { label: "Saved farmers", value: "9", change: "+2 this month", icon: Heart, tone: "alert" },
-  { label: "This month's spend", value: "94,500 FCFA", change: "+11% vs last month", icon: Banknote, tone: "yellow" },
-  { label: "Messages", value: "3", change: "1 unread", icon: MessageSquare, tone: "green" },
-  { label: "Marketplace listings", value: "512", change: "Browse produce near you", icon: Store, tone: "sky" },
+const initialStats = [
+  { key: "placed", label: "Orders placed", value: "—", change: "Loading...", icon: Package, tone: "green" },
+  { key: "transit", label: "Orders in transit", value: "—", change: "Loading...", icon: Truck, tone: "sky" },
+  { key: "farmers", label: "Farmers ordered from", value: "—", change: "Loading...", icon: Heart, tone: "alert" },
+  { key: "spend", label: "This month's spend", value: "—", change: "Loading...", icon: Banknote, tone: "yellow" },
+  { key: "unread", label: "Messages", value: "—", change: "Loading...", icon: MessageSquare, tone: "green" },
+  { key: "listings", label: "Marketplace listings", value: "—", change: "Loading...", icon: Store, tone: "sky" },
 ];
 
 const purchaseBreakdown = [
@@ -54,7 +57,7 @@ const quickActions = [
   { title: "Track my orders", desc: "See the status of orders you've placed.", icon: Package, href: "/buyer/orders" },
   { title: "Saved farmers", desc: "Quickly reorder from farmers you trust.", icon: Heart },
   { title: "Message a farmer", desc: "Ask about availability, pricing or delivery.", icon: MessageSquare, href: "/messages" },
-  { title: "Order history", desc: "Download receipts for past purchases.", icon: Receipt },
+  { title: "Order history", desc: "Review your past delivered orders.", icon: Receipt, href: "/buyer/orders?status=DELIVERED" },
   { title: "Delivery tracking", desc: "Follow your order from farm to doorstep.", icon: Truck },
 ];
 
@@ -72,8 +75,8 @@ const navItems = [
   { label: "My Orders", icon: Package, href: "/buyer/orders" },
   { label: "Saved Farmers", icon: Heart },
   { label: "Messages", icon: MessageSquare, href: "/messages" },
-  { label: "Order History", icon: Receipt },
-  { label: "Settings", icon: Settings },
+  { label: "Order History", icon: Receipt, href: "/buyer/orders?status=DELIVERED" },
+  { label: "Settings", icon: Settings, href: "/settings" },
 ];
 
 function BuyerDashboard() {
@@ -82,6 +85,24 @@ function BuyerDashboard() {
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [stats, setStats] = useState(initialStats);
+
+  useEffect(() => {
+    if (!user) return;
+    fetch("/api/stats")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.stats) {
+          setStats(
+            data.stats.map((s: { icon: string; [k: string]: unknown }) => ({
+              ...s,
+              icon: STAT_ICONS[s.icon] ?? Store,
+            }))
+          );
+        }
+      })
+      .catch(() => {});
+  }, [user]);
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });

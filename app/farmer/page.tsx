@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -8,8 +8,12 @@ import {
   BadgeCheck,
   Banknote,
   Bell,
+  BookOpen,
+  CalendarDays,
   ChevronDown,
   Clock,
+  Cloud,
+  CloudRain,
   CloudSun,
   Layout,
   LayoutDashboard,
@@ -21,26 +25,36 @@ import {
   Search,
   Settings,
   Sprout,
+  Stethoscope,
   Store,
+  Sun,
+  Thermometer,
   X,
+  Bot,
+  Cpu,
 } from "lucide-react";
 
-import Logo from "../../components/Logo";
-import { useSession } from "../../lib/useSession";
+import Logo from "@/components/Logo";
+import { useSession } from "@/lib/useSession";
+import WeatherWidget from "@/components/WeatherWidget";
+import DashboardSidebar from "@/components/DashboardSidebar";
 
-/* ============================================================
-   Sample data — the dashboard shell is fully built, but every
-   number here is placeholder content until it's wired to
-   PostgreSQL/Prisma.
-============================================================ */
+const STAT_ICONS: Record<string, typeof Sprout> = {
+  Store,
+  Sprout,
+  Package,
+  Banknote,
+  MessageSquare,
+  Activity,
+};
 
-const stats = [
-  { label: "My farms", value: "3", change: "1 added this year", icon: Sprout, tone: "green" },
-  { label: "Active listings", value: "12", change: "+4 this month", icon: Store, tone: "sky" },
-  { label: "Orders received", value: "28", change: "+6 this week", icon: Package, tone: "green" },
-  { label: "This month's sales", value: "185,000 FCFA", change: "+18% vs last month", icon: Banknote, tone: "yellow" },
-  { label: "Messages", value: "5", change: "2 unread", icon: MessageSquare, tone: "alert" },
-  { label: "Connected sensors", value: "0", change: "Not set up yet", icon: Activity, tone: "sky" },
+const initialStats = [
+  { key: "listings", label: "Total listings", value: "—", change: "Loading...", icon: Store, tone: "sky" },
+  { key: "active", label: "Active listings", value: "—", change: "Loading...", icon: Sprout, tone: "sky" },
+  { key: "orders", label: "Orders received", value: "—", change: "Loading...", icon: Package, tone: "green" },
+  { key: "sales", label: "This month's sales", value: "—", change: "Loading...", icon: Banknote, tone: "yellow" },
+  { key: "unread", label: "Messages", value: "—", change: "Loading...", icon: MessageSquare, tone: "green" },
+  { key: "sensors", label: "Connected sensors", value: "—", change: "Loading...", icon: Activity, tone: "sky" },
 ];
 
 const cropBreakdown = [
@@ -51,12 +65,16 @@ const cropBreakdown = [
 ];
 
 const quickActions = [
-  { title: "Add a farm", desc: "Register a new farm and start tracking it.", icon: Plus },
+  { title: "Add a farm", desc: "Register a new farm and start tracking it.", icon: Plus, href: "/farmer/farms" },
   { title: "Create a listing", desc: "Put your produce up for sale on the marketplace.", icon: Store, href: "/farmer/marketplace/new" },
   { title: "View my orders", desc: "Track orders placed by buyers.", icon: Package, href: "/farmer/orders" },
   { title: "Ask an agronomist", desc: "Get expert advice on crops or livestock.", icon: MessageSquare, href: "/messages" },
+  { title: "Request a diagnosis", desc: "Get expert help with a crop issue, with a photo.", icon: Stethoscope, href: "/farmer/diagnosis" },
+  { title: "Book a consultation", desc: "Schedule a call or visit with an agronomist.", icon: CalendarDays, href: "/farmer/consultations" },
   { title: "IoT devices", desc: "Connect soil, weather and crop sensors.", icon: Activity, href: "/farmer/iot" },
-  { title: "Weather forecast", desc: "Check conditions for your farm's region.", icon: CloudSun },
+  { title: "IoT Dashboard", desc: "Monitor your sensors in real-time.", icon: Cpu, href: "/farmer/iot-dashboard" },
+  { title: "Advisory articles", desc: "Read agricultural guidance from experts.", icon: BookOpen, href: "/articles" },
+  { title: "AI Assistant", desc: "Get instant agricultural advice from our AI.", icon: Bot, href: "/ai-chat" },
 ];
 
 const recentActivity = [
@@ -67,15 +85,44 @@ const recentActivity = [
   { name: "Buyer Amina N.", action: "sent you a message", time: "yesterday", icon: MessageSquare },
 ];
 
+// UPDATED: Added IoT Dashboard to navigation
 const navItems = [
-  { label: "Dashboard", icon: LayoutDashboard, active: true },
-  { label: "My Farms", icon: Sprout },
+  { label: "Dashboard", icon: LayoutDashboard, href: "/farmer", active: true },
+  { label: "My Farms", icon: Sprout, href: "/farmer/farms" },
   { label: "Marketplace", icon: Store, href: "/farmer/marketplace" },
   { label: "Orders", icon: Package, href: "/farmer/orders" },
   { label: "IoT Devices", icon: Activity, href: "/farmer/iot" },
+  { label: "IoT Dashboard", icon: Cpu, href: "/farmer/iot-dashboard" },
+  { label: "Weather", icon: Cloud, href: "/weather" },
+  { label: "AI Assistant", icon: Bot, href: "/ai-chat" },
   { label: "Messages", icon: MessageSquare, href: "/messages" },
-  { label: "Settings", icon: Settings },
+  { label: "Consultations", icon: CalendarDays, href: "/farmer/consultations" },
+  { label: "Diagnosis", icon: Stethoscope, href: "/farmer/diagnosis" },
+  { label: "Articles", icon: BookOpen, href: "/articles" },
+  { label: "Settings", icon: Settings, href: "/settings" },
 ];
+
+type WeatherData = {
+  current_weather: {
+    temperature: number;
+    windspeed: number;
+    weathercode: number;
+  };
+  hourly: {
+    temperature_2m: number[];
+    precipitation: number[];
+    relative_humidity_2m: number[];
+  };
+};
+
+function getWeatherInfo(code: number): { icon: typeof Sun; label: string; color: string } {
+  if (code === 0) return { icon: Sun, label: "Clear sky", color: "#f59e0b" };
+  if (code === 1 || code === 2 || code === 3) return { icon: CloudSun, label: "Partly cloudy", color: "#6b7280" };
+  if (code >= 45 && code <= 48) return { icon: Cloud, label: "Foggy", color: "#9ca3af" };
+  if (code >= 51 && code <= 67) return { icon: CloudRain, label: "Rainy", color: "#3b82f6" };
+  if (code >= 80 && code <= 82) return { icon: CloudRain, label: "Rain showers", color: "#2563eb" };
+  return { icon: Cloud, label: "Cloudy", color: "#6b7280" };
+}
 
 function FarmerDashboard() {
   const router = useRouter();
@@ -83,6 +130,64 @@ function FarmerDashboard() {
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [stats, setStats] = useState(initialStats);
+  const [weather, setWeather] = useState<WeatherData | null>(null);
+  const [weatherLoading, setWeatherLoading] = useState(true);
+
+  useEffect(() => {
+    if (!user) return;
+    fetch("/api/stats")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.stats) {
+          setStats(
+            data.stats.map((s: { icon: string; [k: string]: unknown }) => ({
+              ...s,
+              icon: STAT_ICONS[s.icon] ?? Store,
+            }))
+          );
+        }
+      })
+      .catch(() => {});
+  }, [user]);
+
+  useEffect(() => {
+    if (!user || !user.region) {
+      setWeatherLoading(false);
+      return;
+    }
+
+    const regionCoords: Record<string, { lat: number; lon: number }> = {
+      "Adamawa": { lat: 7.0, lon: 13.5 },
+      "Centre": { lat: 4.0, lon: 12.0 },
+      "East": { lat: 4.5, lon: 14.0 },
+      "Far North": { lat: 11.0, lon: 14.0 },
+      "Littoral": { lat: 4.0, lon: 9.7 },
+      "North": { lat: 9.0, lon: 13.0 },
+      "Northwest": { lat: 6.0, lon: 10.0 },
+      "West": { lat: 5.5, lon: 10.5 },
+      "South": { lat: 3.0, lon: 11.5 },
+      "Southwest": { lat: 4.5, lon: 9.2 },
+    };
+
+    const coords = regionCoords[user.region];
+    if (!coords) {
+      setWeatherLoading(false);
+      return;
+    }
+
+    fetch(`/api/weather?lat=${coords.lat}&lon=${coords.lon}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.current_weather) {
+          setWeather(data);
+        }
+        setWeatherLoading(false);
+      })
+      .catch(() => {
+        setWeatherLoading(false);
+      });
+  }, [user]);
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -96,91 +201,24 @@ function FarmerDashboard() {
   const initial = user.name.charAt(0).toUpperCase();
   const firstName = user.name.split(" ")[0];
 
+  const weatherInfo = weather?.current_weather 
+    ? getWeatherInfo(weather.current_weather.weathercode)
+    : null;
+
+  const hasIoTInterest = user.iotInterest || false;
+
   return (
     <div className="dash-page">
-      {sidebarOpen && (
-        <div className="dash-overlay" onClick={() => setSidebarOpen(false)} />
-      )}
+      <DashboardSidebar
+        user={user}
+        onLogout={handleLogout}
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+      />
 
-      {/* ================= SIDEBAR ================= */}
-      <aside className={`dash-sidebar ${sidebarOpen ? "dash-sidebar-open" : ""}`}>
-        <div className="dash-sidebar-top">
-          <Link href="/" className="dash-logo">
-            <Logo width={130} />
-          </Link>
-
-          <button
-            className="dash-sidebar-close"
-            onClick={() => setSidebarOpen(false)}
-            aria-label="Close menu"
-          >
-            <X size={18} />
-          </button>
-        </div>
-
-        <nav className="dash-nav">
-          <span className="dash-nav-label">Main</span>
-
-          {navItems.slice(0, 4).map((item) =>
-            item.href ? (
-              <Link key={item.label} href={item.href} className="dash-nav-item">
-                <item.icon size={16} />
-                {item.label}
-              </Link>
-            ) : (
-              <button
-                key={item.label}
-                className={`dash-nav-item ${item.active ? "dash-nav-active" : ""}`}
-              >
-                <item.icon size={16} />
-                {item.label}
-                {!item.active && <span className="dash-soon">Soon</span>}
-              </button>
-            )
-          )}
-
-          <span className="dash-nav-label">Support</span>
-
-          {navItems.slice(4).map((item) =>
-            item.href ? (
-              <Link key={item.label} href={item.href} className="dash-nav-item">
-                <item.icon size={16} />
-                {item.label}
-              </Link>
-            ) : (
-              <button key={item.label} className="dash-nav-item">
-                <item.icon size={16} />
-                {item.label}
-                <span className="dash-soon">Soon</span>
-              </button>
-            )
-          )}
-        </nav>
-
-        <div className="dash-sidebar-bottom">
-          <div className="dash-admin-card">
-            <div className="dash-avatar">{initial}</div>
-            <div>
-              <strong>{user.name}</strong>
-              <span>Farmer account</span>
-            </div>
-          </div>
-
-          <button className="dash-logout" onClick={handleLogout}>
-            <LogOut size={15} />
-            Log out
-          </button>
-        </div>
-      </aside>
-
-      {/* ================= MAIN ================= */}
       <div className="dash-main">
         <header className="dash-topbar">
-          <button
-            className="dash-menu-btn"
-            onClick={() => setSidebarOpen(true)}
-            aria-label="Open menu"
-          >
+          <button className="dash-menu-btn" onClick={() => setSidebarOpen(true)}>
             <Menu size={20} />
           </button>
 
@@ -196,10 +234,7 @@ function FarmerDashboard() {
             </button>
 
             <div className="dash-profile">
-              <button
-                className="dash-profile-btn"
-                onClick={() => setProfileOpen((v) => !v)}
-              >
+              <button className="dash-profile-btn" onClick={() => setProfileOpen((v) => !v)}>
                 <div className="dash-avatar dash-avatar-small">{initial}</div>
                 <span>{firstName}</span>
                 <ChevronDown size={14} />
@@ -208,12 +243,10 @@ function FarmerDashboard() {
               {profileOpen && (
                 <div className="dash-profile-menu">
                   <Link href="/" className="dash-profile-menu-item">
-                    <Layout size={14} />
-                    Back to landing page
+                    <Layout size={14} /> Back to landing page
                   </Link>
                   <button className="dash-profile-menu-item" onClick={handleLogout}>
-                    <LogOut size={14} />
-                    Log out
+                    <LogOut size={14} /> Log out
                   </button>
                 </div>
               )}
@@ -228,6 +261,8 @@ function FarmerDashboard() {
             below are still sample data until those features are built.
           </div>
 
+          <WeatherWidget />
+
           <div className="dash-page-header">
             <div>
               <h1>Welcome back, {firstName} 👋</h1>
@@ -235,7 +270,6 @@ function FarmerDashboard() {
             </div>
           </div>
 
-          {/* ---- Stat cards ---- */}
           <div className="dash-stats-grid">
             {stats.map((s) => (
               <div className="dash-stat-card" key={s.label}>
@@ -251,14 +285,52 @@ function FarmerDashboard() {
             ))}
           </div>
 
-          {/* ---- Breakdown + Activity ---- */}
+          {hasIoTInterest && (
+            <div className="dash-iot-section">
+              <div className="dash-iot-header">
+                <h2>
+                  <Activity size={20} className="text-green-600" />
+                  Your IoT Dashboard
+                </h2>
+                <Link href="/farmer/iot-dashboard" className="btn btn-primary btn-sm">
+                  View Dashboard →
+                </Link>
+              </div>
+              <div className="dash-iot-grid">
+                <div className="dash-iot-card">
+                  <div className="dash-iot-icon">🌱</div>
+                  <div>
+                    <h4>Soil Moisture</h4>
+                    <p className="dash-iot-value">—</p>
+                    <span className="dash-iot-status">No sensors connected</span>
+                  </div>
+                </div>
+                <div className="dash-iot-card">
+                  <div className="dash-iot-icon">🌡️</div>
+                  <div>
+                    <h4>Temperature</h4>
+                    <p className="dash-iot-value">—</p>
+                    <span className="dash-iot-status">No sensors connected</span>
+                  </div>
+                </div>
+                <div className="dash-iot-card">
+                  <div className="dash-iot-icon">📡</div>
+                  <div>
+                    <h4>Devices</h4>
+                    <p className="dash-iot-value">0</p>
+                    <Link href="/farmer/iot" className="dash-iot-link">Add device →</Link>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="dash-split">
             <div className="dash-panel">
               <div className="dash-panel-header">
                 <h2>Crops by type</h2>
                 <span className="dash-sample-tag">Sample data</span>
               </div>
-
               <div className="dash-bars">
                 {cropBreakdown.map((r) => (
                   <div className="dash-bar-row" key={r.label}>
@@ -267,10 +339,7 @@ function FarmerDashboard() {
                       <span>{r.count}</span>
                     </div>
                     <div className="dash-bar-track">
-                      <div
-                        className="dash-bar-fill"
-                        style={{ width: `${r.percent}%` }}
-                      />
+                      <div className="dash-bar-fill" style={{ width: `${r.percent}%` }} />
                     </div>
                   </div>
                 ))}
@@ -282,21 +351,13 @@ function FarmerDashboard() {
                 <h2>Recent activity</h2>
                 <span className="dash-sample-tag">Sample data</span>
               </div>
-
               <div className="dash-activity-list">
                 {recentActivity.map((a, i) => (
                   <div className="dash-activity-item" key={i}>
-                    <div className="dash-activity-icon">
-                      <a.icon size={14} />
-                    </div>
+                    <div className="dash-activity-icon"><a.icon size={14} /></div>
                     <div className="dash-activity-body">
-                      <p>
-                        <strong>{a.name}</strong> {a.action}
-                      </p>
-                      <span>
-                        <Clock size={11} />
-                        {a.time}
-                      </span>
+                      <p><strong>{a.name}</strong> {a.action}</p>
+                      <span><Clock size={11} /> {a.time}</span>
                     </div>
                   </div>
                 ))}
@@ -304,23 +365,16 @@ function FarmerDashboard() {
             </div>
           </div>
 
-          {/* ---- Quick actions ---- */}
           <div className="dash-panel-header dash-actions-header">
             <h2>Quick actions</h2>
           </div>
-
           <div className="dash-actions-grid">
             {quickActions.map((a) =>
               a.href ? (
-                <Link
-                  href={a.href}
-                  className="dash-action-card dash-action-card-link"
-                  key={a.title}
-                >
+                <Link href={a.href} className="dash-action-card dash-action-card-link" key={a.title}>
                   <div className="dash-action-top">
-                    <div className="dash-action-icon">
-                      <a.icon size={18} />
-                    </div>
+                    <div className="dash-action-icon"><a.icon size={18} /></div>
+                    {a.title === "AI Assistant" && <span className="dash-ai-badge">New</span>}
                   </div>
                   <h3>{a.title}</h3>
                   <p>{a.desc}</p>
@@ -328,9 +382,7 @@ function FarmerDashboard() {
               ) : (
                 <div className="dash-action-card" key={a.title}>
                   <div className="dash-action-top">
-                    <div className="dash-action-icon">
-                      <a.icon size={18} />
-                    </div>
+                    <div className="dash-action-icon"><a.icon size={18} /></div>
                     <span className="dash-soon">Coming soon</span>
                   </div>
                   <h3>{a.title}</h3>
@@ -341,10 +393,104 @@ function FarmerDashboard() {
           </div>
         </main>
       </div>
+
+      <style jsx>{`
+        .dash-iot-section {
+          background: white;
+          border-radius: 16px;
+          padding: 20px;
+          margin-bottom: 24px;
+          border: 1px solid #e5e7eb;
+        }
+
+        .dash-iot-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 16px;
+        }
+
+        .dash-iot-header h2 {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          font-size: 16px;
+          font-weight: 600;
+          color: #1f2937;
+          margin: 0;
+        }
+
+        .btn-sm {
+          padding: 6px 16px;
+          font-size: 12px;
+        }
+
+        .dash-iot-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 16px;
+        }
+
+        .dash-iot-card {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 16px;
+          background: #f9fafb;
+          border-radius: 12px;
+          border: 1px solid #e5e7eb;
+        }
+
+        .dash-iot-icon {
+          width: 44px;
+          height: 44px;
+          border-radius: 10px;
+          background: white;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+          font-size: 20px;
+        }
+
+        .dash-iot-card h4 {
+          font-size: 13px;
+          font-weight: 600;
+          color: #1f2937;
+          margin: 0;
+        }
+
+        .dash-iot-value {
+          font-size: 18px;
+          font-weight: 700;
+          color: #1f2937;
+          margin: 0;
+        }
+
+        .dash-iot-status {
+          font-size: 11px;
+          color: #9ca3af;
+        }
+
+        .dash-iot-link {
+          font-size: 12px;
+          color: #059669;
+          font-weight: 600;
+          text-decoration: none;
+        }
+
+        .dash-iot-link:hover {
+          text-decoration: underline;
+        }
+
+        @media (max-width: 768px) {
+          .dash-iot-grid {
+            grid-template-columns: 1fr;
+          }
+        }
+      `}</style>
     </div>
   );
 }
 
-export default function FarmerHomePage() {
-  return <FarmerDashboard />;
-}
+export default FarmerDashboard;

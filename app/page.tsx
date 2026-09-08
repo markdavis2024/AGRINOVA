@@ -2,8 +2,17 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import Logo from "../components/Logo";
 
+// 🖼️ IMAGE URLs - Replace these with your own images
+// 🖼️ IMAGE URLs - Using local images
+const HERO_IMAGE = "/images/hero-bg.jpg";
+const FEATURES_IMAGE = "/images/features-bg.jpg";
+const HOW_IT_WORKS_IMAGE = "/images/how-it-works-bg.jpg";
+const USERS_IMAGE = "/images/users-bg.jpg";
+const IOT_IMAGE = "/images/iot-bg.jpg";
+const ABOUT_IMAGE = "/images/about-bg.jpg";
 const features = [
   {
     icon: "🌱",
@@ -133,17 +142,11 @@ export default function Home() {
             </a>
 
             <div className="mobile-nav-buttons">
-              <button
-                className="btn btn-outline"
-                onClick={goToLogin}
-              >
+              <button className="btn btn-outline" onClick={goToLogin}>
                 Login
               </button>
 
-              <button
-                className="btn btn-primary"
-                onClick={goToRegister}
-              >
+              <button className="btn btn-primary" onClick={goToRegister}>
                 Get Started
               </button>
             </div>
@@ -171,8 +174,20 @@ export default function Home() {
         </div>
       </header>
 
-      {/* ================= HERO ================= */}
+      {/* ================= HERO SECTION WITH BACKGROUND IMAGE ================= */}
       <section className="hero" id="home">
+        {/* Background Image */}
+        <div className="hero-bg">
+          <Image
+            src={HERO_IMAGE}
+            alt="Smart farming in Africa"
+            fill
+            className="hero-bg-image"
+            priority
+          />
+          <div className="hero-overlay"></div>
+        </div>
+
         <div className="hero-decoration hero-decoration-one"></div>
         <div className="hero-decoration hero-decoration-two"></div>
 
@@ -197,10 +212,7 @@ export default function Home() {
             </p>
 
             <div className="hero-buttons">
-              <button
-                className="btn btn-primary btn-large"
-                onClick={goToRegister}
-              >
+              <button className="btn btn-primary btn-large" onClick={goToRegister}>
                 Start with AGRINOVA
                 <span className="arrow">→</span>
               </button>
@@ -327,8 +339,17 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ================= FEATURES ================= */}
+      {/* ================= FEATURES SECTION WITH BACKGROUND IMAGE ================= */}
       <section className="section features-section" id="features">
+        <div className="features-bg">
+          <Image
+            src={FEATURES_IMAGE}
+            alt="Modern farming technology"
+            fill
+            className="features-bg-image"
+          />
+          <div className="features-overlay"></div>
+        </div>
         <div className="container">
           <div className="section-heading">
             <div className="section-label">
@@ -362,10 +383,7 @@ export default function Home() {
                   <p>{feature.description}</p>
                 </div>
 
-                <button
-                  className="learn-more"
-                  onClick={protectedAction}
-                >
+                <button className="learn-more" onClick={protectedAction}>
                   Explore <span>→</span>
                 </button>
               </article>
@@ -374,8 +392,17 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ================= HOW IT WORKS ================= */}
+      {/* ================= HOW IT WORKS SECTION WITH BACKGROUND IMAGE ================= */}
       <section className="section process-section" id="how-it-works">
+        <div className="process-bg">
+          <Image
+            src={HOW_IT_WORKS_IMAGE}
+            alt="Farming process"
+            fill
+            className="process-bg-image"
+          />
+          <div className="process-overlay"></div>
+        </div>
         <div className="container">
           <div className="process-wrapper">
             <div className="process-intro">
@@ -395,10 +422,7 @@ export default function Home() {
                 AGRINOVA keeps the experience simple.
               </p>
 
-              <button
-                className="btn btn-primary"
-                onClick={goToRegister}
-              >
+              <button className="btn btn-primary" onClick={goToRegister}>
                 Create your account →
               </button>
             </div>
@@ -451,8 +475,17 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ================= USER ROLES ================= */}
+      {/* ================= USER ROLES SECTION WITH BACKGROUND IMAGE ================= */}
       <section className="section roles-section" id="roles">
+        <div className="roles-bg">
+          <Image
+            src={USERS_IMAGE}
+            alt="Farmers community"
+            fill
+            className="roles-bg-image"
+          />
+          <div className="roles-overlay"></div>
+        </div>
         <div className="container">
           <div className="section-heading centered">
             <div className="section-label">
@@ -472,10 +505,7 @@ export default function Home() {
 
           <div className="roles-grid">
             {roles.map((role) => (
-              <article
-                className={`role-card role-${role.color}`}
-                key={role.title}
-              >
+              <article className={`role-card role-${role.color}`} key={role.title}>
                 <div className="role-icon">{role.icon}</div>
 
                 <h3>{role.title}</h3>
@@ -483,7 +513,10 @@ export default function Home() {
                 <p>{role.description}</p>
 
                 <button onClick={() => router.push(role.path)}>
-                  Join as {role.title.replace("Agricultural Experts", "Expert").replace("Administrators", "Admin")}
+                  Join as{" "}
+                  {role.title
+                    .replace("Agricultural Experts", "Expert")
+                    .replace("Administrators", "Admin")}
                   <span>→</span>
                 </button>
               </article>
@@ -492,8 +525,17 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ================= IoT ================= */}
+      {/* ================= IoT SECTION WITH BACKGROUND IMAGE ================= */}
       <section className="section iot-section" id="iot">
+        <div className="iot-bg">
+          <Image
+            src={IOT_IMAGE}
+            alt="Smart farming technology"
+            fill
+            className="iot-bg-image"
+          />
+          <div className="iot-overlay"></div>
+        </div>
         <div className="container">
           <div className="iot-card">
             <div className="iot-content">
@@ -535,10 +577,7 @@ export default function Home() {
                 </div>
               </div>
 
-              <button
-                className="btn btn-dark"
-                onClick={protectedAction}
-              >
+              <button className="btn btn-dark" onClick={protectedAction}>
                 Explore Smart Monitoring →
               </button>
             </div>
@@ -684,10 +723,7 @@ export default function Home() {
               </p>
 
               <div className="app-buttons">
-                <button
-                  className="store-button"
-                  onClick={protectedAction}
-                >
+                <button className="store-button" onClick={protectedAction}>
                   <span>▶</span>
                   <div>
                     <small>AVAILABLE SOON</small>
@@ -695,10 +731,7 @@ export default function Home() {
                   </div>
                 </button>
 
-                <button
-                  className="btn btn-primary"
-                  onClick={goToRegister}
-                >
+                <button className="btn btn-primary" onClick={goToRegister}>
                   Get started →
                 </button>
               </div>
@@ -725,9 +758,7 @@ export default function Home() {
                     </div>
                   </div>
 
-                  <div className="phone-section-title">
-                    Farm overview
-                  </div>
+                  <div className="phone-section-title">Farm overview</div>
 
                   <div className="phone-stats">
                     <div>
@@ -780,8 +811,17 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ================= ABOUT ================= */}
+      {/* ================= ABOUT SECTION WITH BACKGROUND IMAGE ================= */}
       <section className="section about-section" id="about">
+        <div className="about-bg">
+          <Image
+            src={ABOUT_IMAGE}
+            alt="About AGRINOVA"
+            fill
+            className="about-bg-image"
+          />
+          <div className="about-overlay"></div>
+        </div>
         <div className="container about-grid">
           <div>
             <div className="section-label">
@@ -847,17 +887,11 @@ export default function Home() {
           </p>
 
           <div className="cta-buttons">
-            <button
-              className="btn btn-dark btn-large"
-              onClick={goToRegister}
-            >
+            <button className="btn btn-dark btn-large" onClick={goToRegister}>
               Create an account →
             </button>
 
-            <button
-              className="cta-login"
-              onClick={goToLogin}
-            >
+            <button className="cta-login" onClick={goToLogin}>
               Already registered? <strong>Login</strong>
             </button>
           </div>
@@ -909,9 +943,7 @@ export default function Home() {
               © {new Date().getFullYear()} AGRINOVA. All rights reserved.
             </span>
 
-            <span>
-              Intelligent Agricultural Management System
-            </span>
+            <span>Intelligent Agricultural Management System</span>
           </div>
         </div>
       </footer>

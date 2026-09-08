@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
+import pg from "pg";
 
 // Prisma ORM 7 removed the built-in query engine — every PrismaClient
 // now needs an explicit driver adapter. This one talks to Postgres
@@ -12,7 +13,12 @@ if (!connectionString) {
   );
 }
 
-const adapter = new PrismaPg({ connectionString });
+// Create a new Pool instance for Prisma adapter
+const pool = new pg.Pool({
+  connectionString,
+});
+
+const adapter = new PrismaPg(pool);
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;

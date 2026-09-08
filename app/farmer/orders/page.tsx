@@ -1,118 +1,28 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  Activity,
   Bell,
   ChevronDown,
-  CircleX,
-  Clock,
-  Hash,
-  ImageOff,
   Layout,
-  LayoutDashboard,
   LogOut,
   Menu,
-  MessageSquare,
-  Package,
-  PackageCheck,
-  Phone,
   Search,
-  Settings,
-  Sprout,
-  Store,
-  Truck,
-  X,
+  Package,
+  BadgeCheck,
 } from "lucide-react";
 
-import Logo from "../../../components/Logo";
-import { useSession } from "../../../lib/useSession";
+import Logo from "@/components/Logo";
+import { useSession } from "@/lib/useSession";
+import DashboardSidebar from "@/components/DashboardSidebar";
 
-type Order = {
-  id: number;
-  quantity: number;
-  totalPrice: number;
-  status: "PENDING" | "CONFIRMED" | "DELIVERED" | "CANCELLED";
-  note: string | null;
-  createdAt: string;
-  listing: { title: string; unit: string; imageUrl: string | null };
-  buyer: {
-    name: string;
-    phone: string | null;
-    town: string | null;
-    region: string | null;
-  };
-};
-
-const navItems = [
-  { label: "Dashboard", icon: LayoutDashboard, href: "/farmer" },
-  { label: "My Farms", icon: Sprout },
-  { label: "Marketplace", icon: Store, href: "/farmer/marketplace" },
-  { label: "Orders", icon: Package, href: "/farmer/orders", active: true },
-  { label: "IoT Devices", icon: Activity, href: "/farmer/iot" },
-  { label: "Messages", icon: MessageSquare },
-  { label: "Settings", icon: Settings },
-];
-
-const statusMeta = {
-  PENDING: { label: "New order", icon: Clock, tone: "pending" },
-  CONFIRMED: { label: "Confirmed", icon: PackageCheck, tone: "confirmed" },
-  DELIVERED: { label: "Delivered", icon: Truck, tone: "delivered" },
-  CANCELLED: { label: "Cancelled", icon: CircleX, tone: "cancelled" },
-};
-
-export default function FarmerOrdersPage() {
+export default function OrdersPage() {
   const router = useRouter();
   const { user, loading } = useSession("FARMER");
-
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-  const [orders, setOrders] = useState<Order[] | null>(null);
-  const [busyId, setBusyId] = useState<number | null>(null);
-  const [message, setMessage] = useState("");
-
-  useEffect(() => {
-    if (!user) return;
-
-    fetch("/api/marketplace/orders?as=farmer")
-      .then((res) => res.json())
-      .then((data) => setOrders(data.orders ?? []))
-      .catch(() => setOrders([]));
-  }, [user]);
-
-  async function updateStatus(id: number, status: string) {
-    setBusyId(id);
-    setMessage("");
-
-    try {
-      const res = await fetch(`/api/marketplace/orders/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
-      });
-
-      const data = await res.json().catch(() => null);
-
-      if (!res.ok) {
-        setMessage(data?.error ?? "Something went wrong. Please try again.");
-        return;
-      }
-
-      setOrders((list) =>
-        list
-          ? list.map((o) =>
-              o.id === id ? { ...o, status: status as Order["status"] } : o
-            )
-          : list
-      );
-    } catch {
-      setMessage("Couldn't reach the server. Please try again.");
-    } finally {
-      setBusyId(null);
-    }
-  }
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -120,7 +30,7 @@ export default function FarmerOrdersPage() {
   }
 
   if (loading || !user) {
-    return <div className="dash-loading">Loading your dashboard...</div>;
+    return <div className="dash-loading">Loading orders...</div>;
   }
 
   const initial = user.name.charAt(0).toUpperCase();
@@ -128,96 +38,22 @@ export default function FarmerOrdersPage() {
 
   return (
     <div className="dash-page">
-      {sidebarOpen && (
-        <div className="dash-overlay" onClick={() => setSidebarOpen(false)} />
-      )}
+      <DashboardSidebar
+        user={user}
+        onLogout={handleLogout}
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+      />
 
-      {/* ================= SIDEBAR ================= */}
-      <aside className={`dash-sidebar ${sidebarOpen ? "dash-sidebar-open" : ""}`}>
-        <div className="dash-sidebar-top">
-          <Link href="/" className="dash-logo">
-            <Logo width={130} />
-          </Link>
-
-          <button
-            className="dash-sidebar-close"
-            onClick={() => setSidebarOpen(false)}
-            aria-label="Close menu"
-          >
-            <X size={18} />
-          </button>
-        </div>
-
-        <nav className="dash-nav">
-          <span className="dash-nav-label">Main</span>
-
-          {navItems.slice(0, 4).map((item) =>
-            item.href ? (
-              <Link
-                key={item.label}
-                href={item.href}
-                className={`dash-nav-item ${item.active ? "dash-nav-active" : ""}`}
-              >
-                <item.icon size={16} />
-                {item.label}
-              </Link>
-            ) : (
-              <button key={item.label} className="dash-nav-item">
-                <item.icon size={16} />
-                {item.label}
-                <span className="dash-soon">Soon</span>
-              </button>
-            )
-          )}
-
-          <span className="dash-nav-label">Support</span>
-
-          {navItems.slice(4).map((item) =>
-            item.href ? (
-              <Link key={item.label} href={item.href} className="dash-nav-item">
-                <item.icon size={16} />
-                {item.label}
-              </Link>
-            ) : (
-              <button key={item.label} className="dash-nav-item">
-                <item.icon size={16} />
-                {item.label}
-                <span className="dash-soon">Soon</span>
-              </button>
-            )
-          )}
-        </nav>
-
-        <div className="dash-sidebar-bottom">
-          <div className="dash-admin-card">
-            <div className="dash-avatar">{initial}</div>
-            <div>
-              <strong>{user.name}</strong>
-              <span>Farmer account</span>
-            </div>
-          </div>
-
-          <button className="dash-logout" onClick={handleLogout}>
-            <LogOut size={15} />
-            Log out
-          </button>
-        </div>
-      </aside>
-
-      {/* ================= MAIN ================= */}
       <div className="dash-main">
         <header className="dash-topbar">
-          <button
-            className="dash-menu-btn"
-            onClick={() => setSidebarOpen(true)}
-            aria-label="Open menu"
-          >
+          <button className="dash-menu-btn" onClick={() => setSidebarOpen(true)}>
             <Menu size={20} />
           </button>
 
           <div className="dash-search">
             <Search size={16} />
-            <input type="text" placeholder="Search incoming orders..." />
+            <input type="text" placeholder="Search orders..." />
           </div>
 
           <div className="dash-topbar-actions">
@@ -227,10 +63,7 @@ export default function FarmerOrdersPage() {
             </button>
 
             <div className="dash-profile">
-              <button
-                className="dash-profile-btn"
-                onClick={() => setProfileOpen((v) => !v)}
-              >
+              <button className="dash-profile-btn" onClick={() => setProfileOpen((v) => !v)}>
                 <div className="dash-avatar dash-avatar-small">{initial}</div>
                 <span>{firstName}</span>
                 <ChevronDown size={14} />
@@ -239,12 +72,10 @@ export default function FarmerOrdersPage() {
               {profileOpen && (
                 <div className="dash-profile-menu">
                   <Link href="/" className="dash-profile-menu-item">
-                    <Layout size={14} />
-                    Back to landing page
+                    <Layout size={14} /> Back to landing page
                   </Link>
                   <button className="dash-profile-menu-item" onClick={handleLogout}>
-                    <LogOut size={14} />
-                    Log out
+                    <LogOut size={14} /> Log out
                   </button>
                 </div>
               )}
@@ -255,100 +86,45 @@ export default function FarmerOrdersPage() {
         <main className="dash-content">
           <div className="dash-page-header">
             <div>
-              <h1>Orders</h1>
-              <p>Manage orders buyers have placed on your listings.</p>
+              <h1>📦 Orders</h1>
+              <p>Track and manage all your incoming orders.</p>
             </div>
           </div>
 
-          {message && <div className="login-message login-error verif-message">{message}</div>}
-
-          {orders === null && (
-            <div className="dash-loading-inline">Loading orders...</div>
-          )}
-
-          {orders !== null && orders.length === 0 && (
-            <div className="verif-empty">
-              <Package size={22} />
-              <h3>No orders yet</h3>
-              <p>Orders placed on your listings will show up here.</p>
-            </div>
-          )}
-
-          <div className="order-list">
-            {orders?.map((o) => {
-              const meta = statusMeta[o.status];
-              return (
-                <div className="order-card" key={o.id}>
-                  <div className="order-card-image">
-                    {o.listing.imageUrl ? (
-                      <img src={o.listing.imageUrl} alt={o.listing.title} />
-                    ) : (
-                      <ImageOff size={20} />
-                    )}
-                  </div>
-
-                  <div className="order-card-body">
-                    <div className="order-card-top">
-                      <h3>{o.listing.title}</h3>
-                      <span className={`order-status order-status-${meta.tone}`}>
-                        <meta.icon size={12} />
-                        {meta.label}
-                      </span>
-                    </div>
-                    <p className="order-card-meta">
-                      <Hash size={11} />
-                      {o.id} · {o.quantity} {o.listing.unit} · buyer:{" "}
-                      {o.buyer.name}
-                      {o.buyer.town ? ` (${o.buyer.town})` : ""}
-                    </p>
-                    {o.note && <p className="order-card-note">&ldquo;{o.note}&rdquo;</p>}
-                  </div>
-
-                  <div className="order-card-side">
-                    <div className="order-card-price">
-                      {o.totalPrice.toLocaleString()} FCFA
-                    </div>
-
-                    {o.buyer.phone && (
-                      <a href={`tel:${o.buyer.phone}`} className="order-call-btn">
-                        <Phone size={13} />
-                        Call buyer
-                      </a>
-                    )}
-
-                    {o.status === "PENDING" && (
-                      <div className="order-actions-row">
-                        <button
-                          className="btn btn-light order-cancel-btn"
-                          disabled={busyId === o.id}
-                          onClick={() => updateStatus(o.id, "CANCELLED")}
-                        >
-                          Decline
-                        </button>
-                        <button
-                          className="btn btn-primary"
-                          disabled={busyId === o.id}
-                          onClick={() => updateStatus(o.id, "CONFIRMED")}
-                        >
-                          Confirm
-                        </button>
-                      </div>
-                    )}
-
-                    {o.status === "CONFIRMED" && (
-                      <button
-                        className="btn btn-primary"
-                        disabled={busyId === o.id}
-                        onClick={() => updateStatus(o.id, "DELIVERED")}
-                      >
-                        Mark delivered
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+          <div className="dash-banner">
+            <BadgeCheck size={16} />
+            Orders feature coming soon! You'll see all your buyer orders here.
           </div>
+
+          <div className="dash-empty-state">
+            <Package size={48} className="text-gray-300" />
+            <h3>No orders yet</h3>
+            <p>Once buyers place orders, they will appear here.</p>
+          </div>
+
+          <style jsx>{`
+            .dash-empty-state {
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
+              padding: 60px 20px;
+              background: white;
+              border-radius: 16px;
+              border: 1px solid #e5e7eb;
+              text-align: center;
+              color: #6b7280;
+            }
+            .dash-empty-state h3 {
+              color: #1f2937;
+              margin: 12px 0 8px 0;
+              font-size: 18px;
+              font-weight: 600;
+            }
+            .dash-empty-state p {
+              margin-bottom: 16px;
+            }
+          `}</style>
         </main>
       </div>
     </div>
