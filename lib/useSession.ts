@@ -11,6 +11,13 @@ interface User {
   iotInterest?: boolean;
 }
 
+export const ROLE_PATH = {
+  FARMER: "/farmer",
+  BUYER: "/buyer",
+  ADMIN: "/admin",
+  AGRONOMIST: "/agronomist",
+};
+
 export function useSession(requiredRole?: string) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -47,7 +54,6 @@ export function useSession(requiredRole?: string) {
         }
       } catch (error) {
         console.error("Session error:", error);
-        // Fallback mock user
         setUser({
           id: "1",
           name: "John Farmer",
@@ -65,4 +71,9 @@ export function useSession(requiredRole?: string) {
   }, []);
 
   return { user, loading };
+}
+
+// For pages that accept any role (marketplace, etc.)
+export function useAnySession() {
+  return useSession();
 }

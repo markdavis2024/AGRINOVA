@@ -1,683 +1,994 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import {
-  Bell,
-  ChevronDown,
-  CircleX,
-  Clock,
-  Hash,
-  Heart,
-  ImageOff,
-  Layout,
-  LayoutDashboard,
-  LogOut,
-  Menu,
-  MessageSquare,
-  Package,
-  PackageCheck,
-  Receipt,
-  Search,
-  Settings,
-  Store,
-  Truck,
-  X,
-} from "lucide-react";
-
-import Logo from "../../../components/Logo";
-import { useSession } from "../../../lib/useSession";
-
-type Order = {
-  id: number;
-  quantity: number;
-  totalPrice: number;
-  status: "PENDING" | "CONFIRMED" | "DELIVERED" | "CANCELLED";
-  note: string | null;
-  createdAt: string;
-  listing: {
-    title: string;
-    unit: string;
-    imageUrl: string | null;
-    farmer: { id: number; name: string; phone: string | null };
-  };
-};
-
-const navItems = [
-  { label: "Dashboard", icon: LayoutDashboard, href: "/buyer" },
-  { label: "Marketplace", icon: Store, href: "/marketplace" },
-  { label: "My Orders", icon: Package, href: "/buyer/orders", active: true },
-  { label: "Saved Farmers", icon: Heart },
-  { label: "Messages", icon: MessageSquare },
-  { label: "Order History", icon: Receipt },
-  { label: "Settings", icon: Settings },
-];
-
-const statusMeta = {
-  PENDING: { label: "Awaiting confirmation", icon: Clock, tone: "pending" },
-  CONFIRMED: { label: "Confirmed", icon: PackageCheck, tone: "confirmed" },
-  DELIVERED: { label: "Delivered", icon: Truck, tone: "delivered" },
-  CANCELLED: { label: "Cancelled", icon: CircleX, tone: "cancelled" },
-};
-
-export default function BuyerOrdersPage() {
-  const router = useRouter();
-  const { user, loading } = useSession("BUYER");
-
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [profileOpen, setProfileOpen] = useState(false);
-  const [orders, setOrders] = useState<Order[] | null>(null);
-  const [busyId, setBusyId] = useState<number | null>(null);
-  const [message, setMessage] = useState("");
-
-  useEffect(() => {
-    if (!user) return;
-
-    fetch("/api/marketplace/orders?as=buyer")
-      .then((res) => res.json())
-      .then((data) => setOrders(data.orders ?? []))
-      .catch(() => setOrders([]));
-  }, [user]);
-
-  async function cancelOrder(id: number) {
-    setBusyId(id);
-    setMessage("");
-
-    try {
-      const res = await fetch(`/api/marketplace/orders/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "CANCELLED" }),
-      });
-
-      const data = await res.json().catch(() => null);
-
-      if (!res.ok) {
-        setMessage(data?.error ?? "Something went wrong. Please try again.");
-        return;
-      }
-
-      setOrders((list) =>
-        list
-          ? list.map((o) => (o.id === id ? { ...o, status: "CANCELLED" } : o))
-          : list
-      );
-    } catch {
-      setMessage("Couldn't reach the server. Please try again.");
-    } finally {
-      setBusyId(null);
-    }
-  }
-
-  async function handleLogout() {
-    await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/login");
-  }
-
-  if (loading || !user) {
-    return <div className="dash-loading">Loading your dashboard...</div>;
-  }
-
-  const initial = user.name.charAt(0).toUpperCase();
-  const firstName = user.name.split(" ")[0];
-
-  return (
-    <div className="dash-page">
-      {sidebarOpen && (
-        <div className="dash-overlay" onClick={() => setSidebarOpen(false)} />
-      )}
-
-      {/* ================= SIDEBAR ================= */}
-      <aside className={`dash-sidebar ${sidebarOpen ? "dash-sidebar-open" : ""}`}>
-        <div className="dash-sidebar-top">
-          <Link href="/" className="dash-logo">
-            <Logo width={130} />
-          </Link>
-
-          <button
-            className="dash-sidebar-close"
-            onClick={() => setSidebarOpen(false)}
-            aria-label="Close menu"
-          >
-            <X size={18} />
-          </button>
-        </div>
-
-        <nav className="dash-nav">
-          <span className="dash-nav-label">Main</span>
-
-          {navItems.slice(0, 4).map((item) =>
-            item.href ? (
-              <Link
-                key={item.label}
-                href={item.href}
-                className={`dash-nav-item ${item.active ? "dash-nav-active" : ""}`}
-              >
-                <item.icon size={16} />
-                {item.label}
-              </Link>
-            ) : (
-              <button key={item.label} className="dash-nav-item">
-                <item.icon size={16} />
-                {item.label}
-                <span className="dash-soon">Soon</span>
-              </button>
-            )
-          )}
-
-          <span className="dash-nav-label">Support</span>
-
-          {navItems.slice(4).map((item) => (
-            <button key={item.label} className="dash-nav-item">
-              <item.icon size={16} />
-              {item.label}
-              <span className="dash-soon">Soon</span>
-            </button>
-          ))}
-        </nav>
-
-        <div className="dash-sidebar-bottom">
-          <div className="dash-admin-card">
-            <div className="dash-avatar">{initial}</div>
-            <div>
-              <strong>{user.name}</strong>
-              <span>Buyer account</span>
-            </div>
-          </div>
-
-          <button className="dash-logout" onClick={handleLogout}>
-            <LogOut size={15} />
-            Log out
-          </button>
-        </div>
-      </aside>
-
-      {/* ================= MAIN ================= */}
-      <div className="dash-main">
-        <header className="dash-topbar">
-          <button
-            className="dash-menu-btn"
-            onClick={() => setSidebarOpen(true)}
-            aria-label="Open menu"
-          >
-            <Menu size={20} />
-          </button>
-
-          <div className="dash-search">
-            <Search size={16} />
-            <input type="text" placeholder="Search your orders..." />
-          </div>
-
-          <div className="dash-topbar-actions">
-            <button className="dash-icon-btn" aria-label="Notifications">
-              <Bell size={18} />
-              <span className="dash-dot" />
-            </button>
-
-            <div className="dash-profile">
-              <button
-                className="dash-profile-btn"
-                onClick={() => setProfileOpen((v) => !v)}
-              >
-                <div className="dash-avatar dash-avatar-small">{initial}</div>
-                <span>{firstName}</span>
-                <ChevronDown size={14} />
-              </button>
-
-              {profileOpen && (
-                <div className="dash-profile-menu">
-                  <Link href="/" className="dash-profile-menu-item">
-                    <Layout size={14} />
-                    Back to landing page
-                  </Link>
-                  <button className="dash-profile-menu-item" onClick={handleLogout}>
-                    <LogOut size={14} />
-                    Log out
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        </header>
-
-        <main className="dash-content">
-          <div className="dash-page-header">
-            <div>
-              <h1>My orders</h1>
-              <p>Track everything you&apos;ve ordered from farmers.</p>
-            </div>
-          </div>
-
-          {message && <div className="login-message login-error verif-message">{message}</div>}
-
-          {orders === null && (
-            <div className="dash-loading-inline">Loading your orders...</div>
-          )}
-
-          {orders !== null && orders.length === 0 && (
-            <div className="verif-empty">
-              <Package size={22} />
-              <h3>No orders yet</h3>
-              <p>Browse the marketplace to place your first order.</p>
-            </div>
-          )}
-
-          <div className="order-list">
-            {orders?.map((o) => {
-              const meta = statusMeta[o.status];
-              return (
-                <div className="order-card" key={o.id}>
-                  <div className="order-card-image">
-                    {o.listing.imageUrl ? (
-                      <img src={o.listing.imageUrl} alt={o.listing.title} />
-                    ) : (
-                      <ImageOff size={20} />
-                    )}
-                  </div>
-
-                  <div className="order-card-body">
-                    <div className="order-card-top">
-                      <h3>{o.listing.title}</h3>
-                      <span className={`order-status order-status-${meta.tone}`}>
-                        <meta.icon size={12} />
-                        {meta.label}
-                      </span>
-                    </div>
-                    <p className="order-card-meta">
-                      <Hash size={11} />
-                      {o.id} · {o.quantity} {o.listing.unit} · from{" "}
-                      {o.listing.farmer.name}
-                    </p>
-                    {o.note && <p className="order-card-note">&ldquo;{o.note}&rdquo;</p>}
-                  </div>
-
-                  <div className="order-card-side">
-                    <div className="order-card-price">
-                      {o.totalPrice.toLocaleString()} FCFA
-                    </div>
-                    <Link href={`/messages?to=${o.listing.farmer.id}`} className="order-call-btn">
-                      <MessageSquare size={13} />
-                      Message
-                    </Link>
-                    {o.status === "PENDING" && (
-                      <button
-                        className="btn btn-light order-cancel-btn"
-                        disabled={busyId === o.id}
-                        onClick={() => cancelOrder(o.id)}
-                      >
-                        Cancel
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </main>
-      </div>
-    </div>
-  );
-}
-"use client";
-
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   Bell,
   ChevronDown,
-  CircleX,
-  Clock,
-  Hash,
-  Heart,
-  ImageOff,
   Layout,
-  LayoutDashboard,
   LogOut,
   Menu,
-  MessageSquare,
-  Package,
-  PackageCheck,
-  Receipt,
   Search,
-  Settings,
-  Store,
-  Truck,
   X,
+  Package,
+  Truck,
+  CheckCircle,
+  Clock,
+  AlertCircle,
+  Eye,
+  ArrowLeft,
+  Filter,
+  Calendar,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
+import { useAnySession } from "@/lib/useSession";
+import NotificationBell from "@/components/NotificationBell";
 
-import Logo from "../../../components/Logo";
-import { useSession } from "../../../lib/useSession";
-
-type Order = {
-  id: number;
+interface Order {
+  id: string;
+  productName: string;
+  farmer: string;
+  farmerLocation: string;
+  date: string;
+  total: number;
   quantity: number;
-  totalPrice: number;
-  status: "PENDING" | "CONFIRMED" | "DELIVERED" | "CANCELLED";
-  note: string | null;
-  createdAt: string;
-  listing: {
-    title: string;
-    unit: string;
-    imageUrl: string | null;
-    farmer: { id: number; name: string; phone: string | null };
-  };
-};
+  unit: string;
+  status: "pending" | "confirmed" | "processing" | "shipped" | "delivered" | "cancelled";
+  delivery: string;
+  image: string;
+}
 
-const navItems = [
-  { label: "Dashboard", icon: LayoutDashboard, href: "/buyer" },
-  { label: "Marketplace", icon: Store, href: "/marketplace" },
-  { label: "My Orders", icon: Package, href: "/buyer/orders" },
-  { label: "Order History", icon: Receipt, href: "/buyer/orders?status=DELIVERED" },
-  { label: "Saved Farmers", icon: Heart },
-  { label: "Messages", icon: MessageSquare, href: "/messages" },
-  { label: "Settings", icon: Settings, href: "/settings" },
+const mockOrders: Order[] = [
+  {
+    id: "ORD-001",
+    productName: "Fresh Maize",
+    farmer: "Jean Baptiste",
+    farmerLocation: "Bamenda, Cameroon",
+    date: "2024-03-20",
+    total: 25000,
+    quantity: 50,
+    unit: "kg",
+    status: "delivered",
+    delivery: "Delivered on March 22",
+    image: "/AGRINOVA-logo.png",
+  },
+  {
+    id: "ORD-002",
+    productName: "Organic Tomatoes",
+    farmer: "Marie Claire",
+    farmerLocation: "Yaoundé, Cameroon",
+    date: "2024-03-18",
+    total: 16000,
+    quantity: 20,
+    unit: "kg",
+    status: "shipped",
+    delivery: "Expected March 25",
+    image: "/AGRINOVA-logo.png",
+  },
+  {
+    id: "ORD-003",
+    productName: "Cassava Tubers",
+    farmer: "Paul Atanga",
+    farmerLocation: "Douala, Cameroon",
+    date: "2024-03-15",
+    total: 30000,
+    quantity: 100,
+    unit: "kg",
+    status: "processing",
+    delivery: "Processing at farm",
+    image: "/AGRINOVA-logo.png",
+  },
+  {
+    id: "ORD-004",
+    productName: "Cocoa Beans",
+    farmer: "Amina Ndongo",
+    farmerLocation: "Buea, Cameroon",
+    date: "2024-03-12",
+    total: 125000,
+    quantity: 50,
+    unit: "kg",
+    status: "confirmed",
+    delivery: "Awaiting pickup",
+    image: "/AGRINOVA-logo.png",
+  },
+  {
+    id: "ORD-005",
+    productName: "Fresh Plantains",
+    farmer: "Joseph Mbarga",
+    farmerLocation: "Limbe, Cameroon",
+    date: "2024-03-10",
+    total: 8000,
+    quantity: 20,
+    unit: "bunches",
+    status: "pending",
+    delivery: "Pending confirmation",
+    image: "/AGRINOVA-logo.png",
+  },
 ];
 
-const filters = [
-  { value: "", label: "All" },
-  { value: "PENDING", label: "Pending" },
-  { value: "CONFIRMED", label: "Confirmed" },
-  { value: "DELIVERED", label: "Delivered" },
-  { value: "CANCELLED", label: "Cancelled" },
-];
-
-const statusMeta = {
-  PENDING: { label: "Awaiting confirmation", icon: Clock, tone: "pending" },
-  CONFIRMED: { label: "Confirmed", icon: PackageCheck, tone: "confirmed" },
-  DELIVERED: { label: "Delivered", icon: Truck, tone: "delivered" },
-  CANCELLED: { label: "Cancelled", icon: CircleX, tone: "cancelled" },
+const statusColors = {
+  pending: { bg: "bg-yellow-50", text: "text-yellow-600", border: "border-yellow-200", icon: Clock },
+  confirmed: { bg: "bg-blue-50", text: "text-blue-600", border: "border-blue-200", icon: CheckCircle },
+  processing: { bg: "bg-purple-50", text: "text-purple-600", border: "border-purple-200", icon: Package },
+  shipped: { bg: "bg-indigo-50", text: "text-indigo-600", border: "border-indigo-200", icon: Truck },
+  delivered: { bg: "bg-green-50", text: "text-green-600", border: "border-green-200", icon: CheckCircle },
+  cancelled: { bg: "bg-red-50", text: "text-red-600", border: "border-red-200", icon: AlertCircle },
 };
 
-function BuyerOrdersInner() {
+const statusLabels = {
+  pending: "Pending",
+  confirmed: "Confirmed",
+  processing: "Processing",
+  shipped: "Shipped",
+  delivered: "Delivered",
+  cancelled: "Cancelled",
+};
+
+function OrdersContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user, loading } = useSession("BUYER");
-
+  const { user, loading } = useAnySession();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-  const [orders, setOrders] = useState<Order[] | null>(null);
-  const [busyId, setBusyId] = useState<number | null>(null);
-  const [message, setMessage] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
-  const statusFilter = searchParams.get("status") ?? "";
-
-  useEffect(() => {
-    if (!user) return;
-
-    fetch("/api/marketplace/orders?as=buyer")
-      .then((res) => res.json())
-      .then((data) => setOrders(data.orders ?? []))
-      .catch(() => setOrders([]));
-  }, [user]);
-
-  const visibleOrders = orders?.filter((o) => !statusFilter || o.status === statusFilter) ?? null;
-
-  async function cancelOrder(id: number) {
-    setBusyId(id);
-    setMessage("");
-
-    try {
-      const res = await fetch(`/api/marketplace/orders/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "CANCELLED" }),
-      });
-
-      const data = await res.json().catch(() => null);
-
-      if (!res.ok) {
-        setMessage(data?.error ?? "Something went wrong. Please try again.");
-        return;
-      }
-
-      setOrders((list) =>
-        list
-          ? list.map((o) => (o.id === id ? { ...o, status: "CANCELLED" } : o))
-          : list
-      );
-    } catch {
-      setMessage("Couldn't reach the server. Please try again.");
-    } finally {
-      setBusyId(null);
-    }
-  }
-
-  async function handleLogout() {
-    await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/login");
-  }
+  const filteredOrders = mockOrders.filter(order => {
+    const matchesSearch = order.productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          order.farmer.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          order.id.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = filterStatus === "all" || order.status === filterStatus;
+    return matchesSearch && matchesStatus;
+  });
 
   if (loading || !user) {
-    return <div className="dash-loading">Loading your dashboard...</div>;
+    return (
+      <div className="orders-loading">
+        <div className="orders-loading-spinner"></div>
+        <span>Loading your orders...</span>
+      </div>
+    );
   }
 
   const initial = user.name.charAt(0).toUpperCase();
   const firstName = user.name.split(" ")[0];
 
   return (
-    <div className="dash-page">
-      {sidebarOpen && (
-        <div className="dash-overlay" onClick={() => setSidebarOpen(false)} />
-      )}
+    <div className="orders-page">
+      {/* Topbar */}
+      <header className="orders-topbar">
+        <button
+          className="orders-menu-btn"
+          onClick={() => setSidebarOpen(true)}
+          aria-label="Open menu"
+        >
+          <Menu size={22} />
+        </button>
 
-      {/* ================= SIDEBAR ================= */}
-      <aside className={`dash-sidebar ${sidebarOpen ? "dash-sidebar-open" : ""}`}>
-        <div className="dash-sidebar-top">
-          <Link href="/" className="dash-logo">
-            <Logo width={130} />
-          </Link>
-
-          <button
-            className="dash-sidebar-close"
-            onClick={() => setSidebarOpen(false)}
-            aria-label="Close menu"
-          >
-            <X size={18} />
-          </button>
+        <div className="orders-brand">
+          <span className="orders-brand-icon">🌱</span>
+          <span className="orders-brand-text">AGRINOVA</span>
+          <span className="orders-brand-badge">My Orders</span>
         </div>
 
-        <nav className="dash-nav">
-          <span className="dash-nav-label">Main</span>
-
-          {navItems.slice(0, 4).map((item) => {
-            const isActive = item.href === `/buyer/orders${statusFilter ? `?status=${statusFilter}` : ""}`;
-            return item.href ? (
-              <Link
-                key={item.label}
-                href={item.href}
-                className={`dash-nav-item ${isActive ? "dash-nav-active" : ""}`}
-              >
-                <item.icon size={16} />
-                {item.label}
-              </Link>
-            ) : (
-              <button key={item.label} className="dash-nav-item">
-                <item.icon size={16} />
-                {item.label}
-                <span className="dash-soon">Soon</span>
-              </button>
-            );
-          })}
-
-          <span className="dash-nav-label">Support</span>
-
-          {navItems.slice(4).map((item) =>
-            item.href ? (
-              <Link key={item.label} href={item.href} className="dash-nav-item">
-                <item.icon size={16} />
-                {item.label}
-              </Link>
-            ) : (
-              <button key={item.label} className="dash-nav-item">
-                <item.icon size={16} />
-                {item.label}
-                <span className="dash-soon">Soon</span>
-              </button>
-            )
-          )}
-        </nav>
-
-        <div className="dash-sidebar-bottom">
-          <div className="dash-admin-card">
-            <div className="dash-avatar">{initial}</div>
-            <div>
-              <strong>{user.name}</strong>
-              <span>Buyer account</span>
-            </div>
-          </div>
-
-          <button className="dash-logout" onClick={handleLogout}>
-            <LogOut size={15} />
-            Log out
-          </button>
+        <div className="orders-search">
+          <Search size={16} />
+          <input
+            type="text"
+            placeholder="Search orders..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
         </div>
-      </aside>
 
-      {/* ================= MAIN ================= */}
-      <div className="dash-main">
-        <header className="dash-topbar">
-          <button
-            className="dash-menu-btn"
-            onClick={() => setSidebarOpen(true)}
-            aria-label="Open menu"
-          >
-            <Menu size={20} />
-          </button>
+        <div className="orders-topbar-actions">
+          <NotificationBell userId={user.id} />
 
-          <div className="dash-search">
-            <Search size={16} />
-            <input type="text" placeholder="Search your orders..." />
-          </div>
-
-          <div className="dash-topbar-actions">
-            <button className="dash-icon-btn" aria-label="Notifications">
-              <Bell size={18} />
-              <span className="dash-dot" />
+          <div className="orders-profile">
+            <button
+              className="orders-profile-btn"
+              onClick={() => setProfileOpen((v) => !v)}
+            >
+              <div className="orders-avatar orders-avatar-small">{initial}</div>
+              <span>{firstName}</span>
+              <ChevronDown size={14} />
             </button>
 
-            <div className="dash-profile">
-              <button
-                className="dash-profile-btn"
-                onClick={() => setProfileOpen((v) => !v)}
-              >
-                <div className="dash-avatar dash-avatar-small">{initial}</div>
-                <span>{firstName}</span>
-                <ChevronDown size={14} />
-              </button>
+            {profileOpen && (
+              <div className="orders-profile-menu">
+                <Link href="/" className="orders-profile-menu-item">
+                  <Layout size={14} />
+                  Back to landing page
+                </Link>
+                <Link href="/buyer" className="orders-profile-menu-item">
+                  <Layout size={14} />
+                  Dashboard
+                </Link>
+                <button
+                  className="orders-profile-menu-item"
+                  onClick={() => router.push("/login")}
+                >
+                  <LogOut size={14} />
+                  Log out
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </header>
 
-              {profileOpen && (
-                <div className="dash-profile-menu">
-                  <Link href="/" className="dash-profile-menu-item">
-                    <Layout size={14} />
-                    Back to landing page
-                  </Link>
-                  <button className="dash-profile-menu-item" onClick={handleLogout}>
-                    <LogOut size={14} />
-                    Log out
-                  </button>
-                </div>
-              )}
+      {/* Main Content */}
+      <div className="orders-content">
+        {/* Back Button */}
+        <Link href="/buyer" className="orders-back-btn">
+          <ArrowLeft size={16} />
+          Back to Dashboard
+        </Link>
+
+        {/* Header */}
+        <div className="orders-header">
+          <div>
+            <h1>My Orders</h1>
+            <p>Track and manage all your orders in one place</p>
+          </div>
+          <div className="orders-stats">
+            <div className="orders-stat">
+              <span className="orders-stat-value">{mockOrders.length}</span>
+              <span className="orders-stat-label">Total Orders</span>
+            </div>
+            <div className="orders-stat">
+              <span className="orders-stat-value">
+                {mockOrders.filter(o => o.status === "delivered").length}
+              </span>
+              <span className="orders-stat-label">Delivered</span>
+            </div>
+            <div className="orders-stat">
+              <span className="orders-stat-value">
+                {mockOrders.filter(o => o.status === "shipped" || o.status === "processing").length}
+              </span>
+              <span className="orders-stat-label">In Transit</span>
             </div>
           </div>
-        </header>
+        </div>
 
-        <main className="dash-content">
-          <div className="dash-page-header">
-            <div>
-              <h1>My orders</h1>
-              <p>Track everything you&apos;ve ordered from farmers.</p>
-            </div>
-          </div>
+        {/* Filters */}
+        <div className="orders-filters">
+          <button
+            className={`orders-filter-btn ${filterStatus === "all" ? "orders-filter-active" : ""}`}
+            onClick={() => setFilterStatus("all")}
+          >
+            All
+          </button>
+          {Object.entries(statusLabels).map(([key, label]) => (
+            <button
+              key={key}
+              className={`orders-filter-btn ${filterStatus === key ? "orders-filter-active" : ""}`}
+              onClick={() => setFilterStatus(key)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
 
-          <div className="market-filters">
-            {filters.map((f) => (
-              <Link
-                key={f.value}
-                href={f.value ? `/buyer/orders?status=${f.value}` : "/buyer/orders"}
-                className={`auth-chip ${statusFilter === f.value ? "auth-chip-active" : ""}`}
-              >
-                {f.label}
+        {/* Orders List */}
+        <div className="orders-list">
+          {filteredOrders.length === 0 ? (
+            <div className="orders-empty">
+              <Package size={48} />
+              <h3>No orders found</h3>
+              <p>Try adjusting your search or filter criteria</p>
+              <Link href="/marketplace" className="orders-empty-btn">
+                Browse Marketplace
               </Link>
-            ))}
-          </div>
-
-          {message && <div className="login-message login-error verif-message">{message}</div>}
-
-          {orders === null && (
-            <div className="dash-loading-inline">Loading your orders...</div>
-          )}
-
-          {visibleOrders !== null && visibleOrders.length === 0 && (
-            <div className="verif-empty">
-              <Package size={22} />
-              <h3>No orders here</h3>
-              <p>{statusFilter ? "Nothing matches this filter yet." : "Browse the marketplace to place your first order."}</p>
             </div>
-          )}
-
-          <div className="order-list">
-            {visibleOrders?.map((o) => {
-              const meta = statusMeta[o.status];
+          ) : (
+            filteredOrders.map((order) => {
+              const statusColor = statusColors[order.status];
+              const StatusIcon = statusColor.icon;
               return (
-                <div className="order-card" key={o.id}>
-                  <div className="order-card-image">
-                    {o.listing.imageUrl ? (
-                      <img src={o.listing.imageUrl} alt={o.listing.title} />
-                    ) : (
-                      <ImageOff size={20} />
+                <div key={order.id} className="orders-card">
+                  <div className="orders-card-header">
+                    <div className="orders-card-id">
+                      <span className="orders-card-id-label">Order</span>
+                      <span className="orders-card-id-value">{order.id}</span>
+                    </div>
+                    <div className={`orders-card-status ${statusColor.bg} ${statusColor.text} ${statusColor.border}`}>
+                      <StatusIcon size={14} />
+                      <span>{statusLabels[order.status]}</span>
+                    </div>
+                  </div>
+
+                  <div className="orders-card-body">
+                    <div className="orders-card-product">
+                      <div className="orders-card-product-image">
+                        <Package size={24} />
+                      </div>
+                      <div className="orders-card-product-info">
+                        <h3>{order.productName}</h3>
+                        <p>
+                          <span>{order.farmer}</span>
+                          <span className="orders-card-product-location">{order.farmerLocation}</span>
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="orders-card-details">
+                      <div className="orders-card-detail">
+                        <span className="orders-card-detail-label">Quantity</span>
+                        <span className="orders-card-detail-value">
+                          {order.quantity} {order.unit}
+                        </span>
+                      </div>
+                      <div className="orders-card-detail">
+                        <span className="orders-card-detail-label">Total</span>
+                        <span className="orders-card-detail-value">
+                          {order.total.toLocaleString()} FCFA
+                        </span>
+                      </div>
+                      <div className="orders-card-detail">
+                        <span className="orders-card-detail-label">Date</span>
+                        <span className="orders-card-detail-value">
+                          {new Date(order.date).toLocaleDateString()}
+                        </span>
+                      </div>
+                      <div className="orders-card-detail">
+                        <span className="orders-card-detail-label">Delivery</span>
+                        <span className="orders-card-detail-value">{order.delivery}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="orders-card-footer">
+                    <button className="orders-card-track-btn">
+                      <Eye size={16} />
+                      Track Order
+                    </button>
+                    {order.status === "pending" && (
+                      <button className="orders-card-cancel-btn">
+                        Cancel Order
+                      </button>
                     )}
-                  </div>
-
-                  <div className="order-card-body">
-                    <div className="order-card-top">
-                      <h3>{o.listing.title}</h3>
-                      <span className={`order-status order-status-${meta.tone}`}>
-                        <meta.icon size={12} />
-                        {meta.label}
-                      </span>
-                    </div>
-                    <p className="order-card-meta">
-                      <Hash size={11} />
-                      {o.id} · {o.quantity} {o.listing.unit} · from{" "}
-                      {o.listing.farmer.name}
-                    </p>
-                    {o.note && <p className="order-card-note">&ldquo;{o.note}&rdquo;</p>}
-                  </div>
-
-                  <div className="order-card-side">
-                    <div className="order-card-price">
-                      {o.totalPrice.toLocaleString()} FCFA
-                    </div>
-                    <Link href={`/messages?to=${o.listing.farmer.id}`} className="order-call-btn">
-                      <MessageSquare size={13} />
-                      Message
-                    </Link>
-                    {o.status === "PENDING" && (
-                      <button
-                        className="btn btn-light order-cancel-btn"
-                        disabled={busyId === o.id}
-                        onClick={() => cancelOrder(o.id)}
-                      >
-                        Cancel
+                    {order.status === "delivered" && (
+                      <button className="orders-card-review-btn">
+                        Leave Review
                       </button>
                     )}
                   </div>
                 </div>
               );
-            })}
-          </div>
-        </main>
+            })
+          )}
+        </div>
       </div>
+
+      <style jsx>{`
+        /* Page */
+        .orders-page {
+          min-height: 100vh;
+          background: #f5f0e8;
+        }
+
+        /* Loading */
+        .orders-loading {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          min-height: 100vh;
+          background: #f5f0e8;
+          gap: 0.75rem;
+          color: #6b7280;
+        }
+
+        .orders-loading-spinner {
+          width: 1.5rem;
+          height: 1.5rem;
+          border: 2px solid #e8e0d5;
+          border-top-color: #7cb342;
+          border-radius: 50%;
+          animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+
+        /* Topbar */
+        .orders-topbar {
+          display: flex;
+          align-items: center;
+          gap: 1rem;
+          padding: 0.75rem 1.5rem;
+          background: #faf8f5;
+          border-bottom: 1px solid #e8e0d5;
+          position: sticky;
+          top: 0;
+          z-index: 10;
+          flex-wrap: wrap;
+        }
+
+        .orders-menu-btn {
+          padding: 0.5rem;
+          background: none;
+          border: none;
+          border-radius: 0.5rem;
+          cursor: pointer;
+          color: #6b7280;
+          transition: background 0.2s;
+          display: none;
+        }
+
+        .orders-menu-btn:hover {
+          background: #f5f0e8;
+        }
+
+        @media (max-width: 768px) {
+          .orders-menu-btn {
+            display: block;
+          }
+        }
+
+        .orders-brand {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          flex-shrink: 0;
+        }
+
+        .orders-brand-icon {
+          font-size: 1.5rem;
+        }
+
+        .orders-brand-text {
+          font-size: 1.125rem;
+          font-weight: 700;
+          color: #2d5a27;
+        }
+
+        .orders-brand-badge {
+          font-size: 0.625rem;
+          color: #7cb342;
+          background: #e8f5e9;
+          padding: 0.125rem 0.5rem;
+          border-radius: 9999px;
+          font-weight: 500;
+          text-transform: uppercase;
+        }
+
+        .orders-search {
+          flex: 1;
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          background: white;
+          border: 1px solid #e8e0d5;
+          border-radius: 0.75rem;
+          padding: 0.5rem 0.75rem;
+          min-width: 200px;
+          transition: border-color 0.2s;
+        }
+
+        .orders-search:focus-within {
+          border-color: #7cb342;
+          box-shadow: 0 0 0 3px rgba(124, 179, 66, 0.1);
+        }
+
+        .orders-search input {
+          flex: 1;
+          border: none;
+          outline: none;
+          font-size: 0.875rem;
+          background: transparent;
+          color: #2d5a27;
+          min-width: 0;
+        }
+
+        .orders-search input::placeholder {
+          color: #9ca3af;
+        }
+
+        .orders-search svg {
+          color: #9ca3af;
+          flex-shrink: 0;
+        }
+
+        .orders-topbar-actions {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          flex-shrink: 0;
+        }
+
+        .orders-profile {
+          position: relative;
+        }
+
+        .orders-profile-btn {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          padding: 0.375rem 0.5rem;
+          background: none;
+          border: none;
+          border-radius: 0.5rem;
+          cursor: pointer;
+          transition: background 0.2s;
+          font-size: 0.875rem;
+          color: #2d5a27;
+          font-weight: 500;
+          font-family: inherit;
+        }
+
+        .orders-profile-btn:hover {
+          background: #f5f0e8;
+        }
+
+        .orders-avatar {
+          width: 2rem;
+          height: 2rem;
+          background: linear-gradient(135deg, #7cb342, #558b2f);
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 0.75rem;
+          font-weight: 600;
+          color: white;
+          flex-shrink: 0;
+        }
+
+        .orders-avatar-small {
+          width: 2rem;
+          height: 2rem;
+          font-size: 0.7rem;
+        }
+
+        .orders-profile-menu {
+          position: absolute;
+          top: 100%;
+          right: 0;
+          background: white;
+          border: 1px solid #e8e0d5;
+          border-radius: 0.75rem;
+          box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+          min-width: 200px;
+          margin-top: 0.5rem;
+          overflow: hidden;
+          z-index: 10;
+        }
+
+        .orders-profile-menu-item {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          padding: 0.625rem 1rem;
+          color: #6b7280;
+          text-decoration: none;
+          font-size: 0.875rem;
+          transition: background 0.2s;
+          width: 100%;
+          border: none;
+          background: none;
+          cursor: pointer;
+          font-family: inherit;
+        }
+
+        .orders-profile-menu-item:hover {
+          background: #f5f0e8;
+          color: #2d5a27;
+        }
+
+        /* Content */
+        .orders-content {
+          max-width: 1000px;
+          margin: 0 auto;
+          padding: 1.5rem;
+        }
+
+        /* Back Button */
+        .orders-back-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.5rem;
+          color: #6b7280;
+          text-decoration: none;
+          font-size: 0.875rem;
+          transition: color 0.2s;
+          margin-bottom: 1rem;
+        }
+
+        .orders-back-btn:hover {
+          color: #2d5a27;
+        }
+
+        /* Header */
+        .orders-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          margin-bottom: 1.5rem;
+          flex-wrap: wrap;
+          gap: 1rem;
+        }
+
+        .orders-header h1 {
+          font-size: 1.5rem;
+          font-weight: 700;
+          color: #2d5a27;
+        }
+
+        .orders-header p {
+          color: #6b7280;
+          font-size: 0.875rem;
+        }
+
+        .orders-stats {
+          display: flex;
+          gap: 1.5rem;
+        }
+
+        .orders-stat {
+          text-align: center;
+        }
+
+        .orders-stat-value {
+          display: block;
+          font-size: 1.25rem;
+          font-weight: 700;
+          color: #2d5a27;
+        }
+
+        .orders-stat-label {
+          font-size: 0.625rem;
+          color: #6b7280;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+        }
+
+        /* Filters */
+        .orders-filters {
+          display: flex;
+          gap: 0.5rem;
+          flex-wrap: wrap;
+          margin-bottom: 1.5rem;
+        }
+
+        .orders-filter-btn {
+          padding: 0.375rem 0.75rem;
+          border: 1px solid #e8e0d5;
+          border-radius: 9999px;
+          font-size: 0.75rem;
+          color: #6b7280;
+          background: #faf8f5;
+          cursor: pointer;
+          transition: all 0.2s;
+          font-family: inherit;
+        }
+
+        .orders-filter-btn:hover {
+          border-color: #7cb342;
+          color: #2d5a27;
+        }
+
+        .orders-filter-active {
+          background: #7cb342;
+          color: white;
+          border-color: #7cb342;
+        }
+
+        .orders-filter-active:hover {
+          background: #558b2f;
+          color: white;
+        }
+
+        /* Orders List */
+        .orders-list {
+          display: flex;
+          flex-direction: column;
+          gap: 1rem;
+        }
+
+        .orders-card {
+          background: #faf8f5;
+          border: 1px solid #e8e0d5;
+          border-radius: 1rem;
+          overflow: hidden;
+          transition: all 0.2s;
+        }
+
+        .orders-card:hover {
+          border-color: #7cb342;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        }
+
+        .orders-card-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 0.75rem 1rem;
+          background: #f5f0e8;
+          border-bottom: 1px solid #e8e0d5;
+        }
+
+        .orders-card-id {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+        }
+
+        .orders-card-id-label {
+          font-size: 0.625rem;
+          color: #6b7280;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+        }
+
+        .orders-card-id-value {
+          font-size: 0.75rem;
+          font-weight: 600;
+          color: #2d5a27;
+        }
+
+        .orders-card-status {
+          display: flex;
+          align-items: center;
+          gap: 0.25rem;
+          padding: 0.125rem 0.5rem;
+          border-radius: 9999px;
+          font-size: 0.625rem;
+          font-weight: 500;
+          border: 1px solid transparent;
+        }
+
+        .orders-card-body {
+          padding: 1rem;
+        }
+
+        .orders-card-product {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          margin-bottom: 0.75rem;
+        }
+
+        .orders-card-product-image {
+          width: 3rem;
+          height: 3rem;
+          background: #f5f0e8;
+          border-radius: 0.5rem;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #7cb342;
+        }
+
+        .orders-card-product-info h3 {
+          font-size: 0.875rem;
+          font-weight: 600;
+          color: #2d5a27;
+          margin: 0;
+        }
+
+        .orders-card-product-info p {
+          font-size: 0.75rem;
+          color: #6b7280;
+          margin: 0;
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          flex-wrap: wrap;
+        }
+
+        .orders-card-product-location {
+          color: #9ca3af;
+        }
+
+        .orders-card-details {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 0.5rem;
+          padding-top: 0.75rem;
+          border-top: 1px solid #f5f0e8;
+        }
+
+        .orders-card-detail {
+          display: flex;
+          flex-direction: column;
+        }
+
+        .orders-card-detail-label {
+          font-size: 0.55rem;
+          color: #9ca3af;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+        }
+
+        .orders-card-detail-value {
+          font-size: 0.75rem;
+          font-weight: 600;
+          color: #2d5a27;
+        }
+
+        .orders-card-footer {
+          display: flex;
+          gap: 0.5rem;
+          padding: 0.75rem 1rem;
+          border-top: 1px solid #f5f0e8;
+          flex-wrap: wrap;
+        }
+
+        .orders-card-track-btn {
+          display: flex;
+          align-items: center;
+          gap: 0.375rem;
+          padding: 0.375rem 0.75rem;
+          background: #7cb342;
+          color: white;
+          border: none;
+          border-radius: 0.5rem;
+          font-size: 0.7rem;
+          font-weight: 500;
+          cursor: pointer;
+          transition: background 0.2s;
+          font-family: inherit;
+        }
+
+        .orders-card-track-btn:hover {
+          background: #558b2f;
+        }
+
+        .orders-card-cancel-btn {
+          padding: 0.375rem 0.75rem;
+          background: #fef2f2;
+          color: #ef4444;
+          border: 1px solid #fecaca;
+          border-radius: 0.5rem;
+          font-size: 0.7rem;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.2s;
+          font-family: inherit;
+        }
+
+        .orders-card-cancel-btn:hover {
+          background: #fee2e2;
+        }
+
+        .orders-card-review-btn {
+          padding: 0.375rem 0.75rem;
+          background: #f5f0e8;
+          color: #6b7280;
+          border: 1px solid #e8e0d5;
+          border-radius: 0.5rem;
+          font-size: 0.7rem;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.2s;
+          font-family: inherit;
+        }
+
+        .orders-card-review-btn:hover {
+          border-color: #7cb342;
+          color: #2d5a27;
+        }
+
+        /* Empty */
+        .orders-empty {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          padding: 3rem;
+          background: #faf8f5;
+          border: 1px solid #e8e0d5;
+          border-radius: 1rem;
+          color: #9ca3af;
+          text-align: center;
+        }
+
+        .orders-empty h3 {
+          font-size: 1.125rem;
+          color: #2d5a27;
+          margin: 1rem 0 0.25rem 0;
+        }
+
+        .orders-empty p {
+          font-size: 0.875rem;
+          margin: 0 0 1rem 0;
+        }
+
+        .orders-empty-btn {
+          padding: 0.5rem 1.5rem;
+          background: #7cb342;
+          color: white;
+          border: none;
+          border-radius: 0.5rem;
+          font-size: 0.875rem;
+          font-weight: 500;
+          cursor: pointer;
+          transition: background 0.2s;
+          text-decoration: none;
+        }
+
+        .orders-empty-btn:hover {
+          background: #558b2f;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+          .orders-topbar {
+            padding: 0.5rem 1rem;
+          }
+
+          .orders-search {
+            min-width: 150px;
+          }
+
+          .orders-content {
+            padding: 1rem;
+          }
+
+          .orders-header {
+            flex-direction: column;
+          }
+
+          .orders-stats {
+            width: 100%;
+            justify-content: space-around;
+          }
+
+          .orders-card-details {
+            grid-template-columns: repeat(2, 1fr);
+          }
+
+          .orders-brand-text {
+            display: none;
+          }
+        }
+
+        @media (max-width: 480px) {
+          .orders-topbar {
+            gap: 0.5rem;
+          }
+
+          .orders-card-details {
+            grid-template-columns: 1fr 1fr;
+          }
+
+          .orders-card-footer {
+            flex-direction: column;
+          }
+
+          .orders-card-footer button {
+            width: 100%;
+            justify-content: center;
+          }
+
+          .orders-filters {
+            gap: 0.25rem;
+          }
+
+          .orders-filter-btn {
+            font-size: 0.65rem;
+            padding: 0.25rem 0.5rem;
+          }
+        }
+      `}</style>
     </div>
   );
 }
 
-export default function BuyerOrdersPage() {
+export default function OrdersPage() {
   return (
-    <Suspense fallback={<div className="dash-loading">Loading your orders...</div>}>
-      <BuyerOrdersInner />
+    <Suspense fallback={
+      <div className="orders-loading">
+        <div className="orders-loading-spinner"></div>
+        <span>Loading orders...</span>
+      </div>
+    }>
+      <OrdersContent />
     </Suspense>
   );
 }

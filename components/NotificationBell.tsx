@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Bell, X, Check, CheckCheck, Trash2, BellOff } from "lucide-react";
 import Link from "next/link";
-import { notificationService, Notification } from "@/lib/notificationService";
+import { notificationService, type Notification } from "../lib/notificationService";
 
 interface NotificationBellProps {
   userId: string;

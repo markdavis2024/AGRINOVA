@@ -1,32 +1,42 @@
-import Image from "next/image";
+"use client";
 
-/**
- * AGRINOVA logo — single source of truth for the whole app.
- * The wordmark ("AGRINOVA") is baked into the PNG, so no
- * separate text is needed next to it.
- *
- * Usage:
- *   <Logo />                 // default size (navbar)
- *   <Logo width={130} />     // smaller (footer)
- *   <Logo width={220} />     // larger (auth pages, hero)
- */
-export default function Logo({
-  width = 160,
-  className = "",
-}: {
+import Image from "next/image";
+import { useState } from "react";
+
+interface LogoProps {
   width?: number;
+  height?: number;
+  showText?: boolean;
   className?: string;
-}) {
-  const height = Math.round((width * 720) / 1325); // locked aspect ratio
+}
+
+export default function Logo({ 
+  width = 150, 
+  height = 50, 
+  showText = true,
+  className = "" 
+}: LogoProps) {
+  const [imgError, setImgError] = useState(false);
 
   return (
-    <Image
-      src="/agrinova-logo.png"
-      alt="AGRINOVA"
-      width={width}
-      height={height}
-      priority
-      className={`agrinova-logo-image ${className}`.trim()}
-    />
+    <div className={`flex items-center gap-2 ${className}`}>
+      {!imgError ? (
+        <Image
+          src="/AGRINOVA-logo.png"
+          alt="AGRINOVA Logo"
+          width={width}
+          height={height}
+          className="object-contain"
+          priority
+          onError={() => setImgError(true)}
+        />
+      ) : (
+        // Fallback - show a simple text logo if image fails
+        <div className="flex items-center gap-2">
+          <span className="text-2xl">🌱</span>
+          <span className="text-xl font-bold text-[#2d5a27]">AGRINOVA</span>
+        </div>
+      )}
+    </div>
   );
 }

@@ -32,6 +32,8 @@ import {
 
 import { useSession } from "@/lib/useSession";
 import DashboardSidebar from "@/components/DashboardSidebar";
+import NotificationBell from "@/components/NotificationBell";
+import { weatherService } from "@/lib/weatherService";
 
 const STAT_ICONS: Record<string, typeof Sprout> = {
   Store,
@@ -104,6 +106,22 @@ function FarmerDashboard() {
   const [profileOpen, setProfileOpen] = useState(false);
   const [stats, setStats] = useState(initialStats);
 
+  // Start weather monitoring
+  useEffect(() => {
+    if (user) {
+      // Start weather monitoring for notifications
+      weatherService.startMonitoring();
+      
+      // Initialize notification service with user ID
+      const { notificationService } = require('@/lib/notificationService');
+      notificationService.initialize(user.id);
+    }
+
+    return () => {
+      weatherService.stopMonitoring();
+    };
+  }, [user]);
+
   useEffect(() => {
     if (!user) return;
     fetch("/api/stats")
@@ -161,10 +179,7 @@ function FarmerDashboard() {
           </div>
 
           <div className="dash-topbar-actions">
-            <button className="dash-icon-btn" aria-label="Notifications">
-              <Bell size={18} />
-              <span className="dash-dot" />
-            </button>
+            <NotificationBell userId={user.id} />
 
             <div className="dash-profile">
               <button className="dash-profile-btn" onClick={() => setProfileOpen((v) => !v)}>
@@ -479,5 +494,3 @@ function FarmerDashboard() {
 }
 
 export default FarmerDashboard;
-
-

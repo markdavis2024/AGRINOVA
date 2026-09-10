@@ -28,6 +28,7 @@
     "react-dom": "19.2.8",
     "react-dropzone": "^20.1.1",
     "react-markdown": "^10.1.0",
+    "react-native-toast-message": "^2.5.2",
     "remark-gfm": "^4.0.1",
     "sharp": "^0.35.4",
     "speakeasy": "^2.0.0",
