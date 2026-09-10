@@ -25,6 +25,7 @@ import {
 
 import Logo from "../../components/Logo";
 import { useSession } from "../../lib/useSession";
+import NotificationBell from "../../components/NotificationBell";
 
 const STAT_ICONS: Record<string, typeof Users> = {
   Users,
@@ -53,11 +54,11 @@ const topicBreakdown = [
 
 const quickActions = [
   { title: "Answer questions", desc: "Reply to farmers waiting on your advice.", icon: MessageCircle, href: "/messages" },
-  { title: "My farmers", desc: "View farmers currently assigned to you.", icon: Users },
-  { title: "Diagnose a crop issue", desc: "Review photo-based diagnosis requests.", icon: Stethoscope },
-  { title: "Schedule a consultation", desc: "Set up a call or farm visit.", icon: Calendar },
-  { title: "Publish an article", desc: "Share advisory content with farmers.", icon: BookOpen },
-  { title: "My credentials", desc: "Track your verification status.", icon: Award },
+  { title: "My farmers", desc: "View farmers currently assigned to you.", icon: Users, href: "/agronomist/farmers" },
+  { title: "Diagnose a crop issue", desc: "Review photo-based diagnosis requests.", icon: Stethoscope, href: "/agronomist/diagnosis" },
+  { title: "Schedule a consultation", desc: "Set up a call or farm visit.", icon: Calendar, href: "/agronomist/consultations" },
+  { title: "Publish an article", desc: "Share advisory content with farmers.", icon: BookOpen, href: "/agronomist/articles" },
+  { title: "My credentials", desc: "Track your verification status.", icon: Award, href: "/agronomist/credentials" },
 ];
 
 const recentActivity = [
@@ -69,12 +70,12 @@ const recentActivity = [
 ];
 
 const navItems = [
-  { label: "Dashboard", icon: LayoutDashboard, active: true },
-  { label: "My Farmers", icon: Users },
+  { label: "Dashboard", icon: LayoutDashboard, href: "/agronomist", active: true },
+  { label: "My Farmers", icon: Users, href: "/agronomist/farmers" },
   { label: "Questions", icon: MessageCircle, href: "/messages" },
-  { label: "Consultations", icon: Calendar },
-  { label: "Diagnosis", icon: Stethoscope },
-  { label: "Articles", icon: BookOpen },
+  { label: "Consultations", icon: Calendar, href: "/agronomist/consultations" },
+  { label: "Diagnosis", icon: Stethoscope, href: "/agronomist/diagnosis" },
+  { label: "Articles", icon: BookOpen, href: "/agronomist/articles" },
   { label: "Settings", icon: Settings, href: "/settings" },
 ];
 
@@ -140,44 +141,31 @@ function AgronomistDashboard() {
         <nav className="dash-nav">
           <span className="dash-nav-label">Main</span>
 
-          {navItems.slice(0, 4).map((item) =>
-            item.href ? (
-              <Link
-                key={item.label}
-                href={item.href}
-                className={`dash-nav-item ${item.active ? "dash-nav-active" : ""}`}
-              >
-                <item.icon size={16} />
-                {item.label}
-              </Link>
-            ) : (
-              <button
-                key={item.label}
-                className={`dash-nav-item ${item.active ? "dash-nav-active" : ""}`}
-              >
-                <item.icon size={16} />
-                {item.label}
-                {!item.active && <span className="dash-soon">Soon</span>}
-              </button>
-            )
-          )}
+          {navItems.slice(0, 4).map((item) => (
+            <Link
+              key={item.label}
+              href={item.href}
+              className={`dash-nav-item ${item.active ? "dash-nav-active" : ""}`}
+              onClick={() => setSidebarOpen(false)}
+            >
+              <item.icon size={16} />
+              {item.label}
+            </Link>
+          ))}
 
           <span className="dash-nav-label">Knowledge</span>
 
-          {navItems.slice(4).map((item) =>
-            item.href ? (
-              <Link key={item.label} href={item.href} className="dash-nav-item">
-                <item.icon size={16} />
-                {item.label}
-              </Link>
-            ) : (
-              <button key={item.label} className="dash-nav-item">
-                <item.icon size={16} />
-                {item.label}
-                <span className="dash-soon">Soon</span>
-              </button>
-            )
-          )}
+          {navItems.slice(4).map((item) => (
+            <Link
+              key={item.label}
+              href={item.href}
+              className="dash-nav-item"
+              onClick={() => setSidebarOpen(false)}
+            >
+              <item.icon size={16} />
+              {item.label}
+            </Link>
+          ))}
         </nav>
 
         <div className="dash-sidebar-bottom">
@@ -213,10 +201,7 @@ function AgronomistDashboard() {
           </div>
 
           <div className="dash-topbar-actions">
-            <button className="dash-icon-btn" aria-label="Notifications">
-              <Bell size={18} />
-              <span className="dash-dot" />
-            </button>
+            <NotificationBell userId={user.id} />
 
             <div className="dash-profile">
               <button
@@ -247,8 +232,7 @@ function AgronomistDashboard() {
         <main className="dash-content">
           <div className="dash-banner">
             <BadgeCheck size={16} />
-            You&apos;re signed in for real — but the stats and activity
-            below are still sample data until those features are built.
+            You&apos;re signed in for real — all features are now active.
           </div>
 
           <div className="dash-page-header">
@@ -333,34 +317,21 @@ function AgronomistDashboard() {
           </div>
 
           <div className="dash-actions-grid">
-            {quickActions.map((a) =>
-              a.href ? (
-                <Link
-                  href={a.href}
-                  className="dash-action-card dash-action-card-link"
-                  key={a.title}
-                >
-                  <div className="dash-action-top">
-                    <div className="dash-action-icon">
-                      <a.icon size={18} />
-                    </div>
+            {quickActions.map((a) => (
+              <Link
+                href={a.href}
+                className="dash-action-card dash-action-card-link"
+                key={a.title}
+              >
+                <div className="dash-action-top">
+                  <div className="dash-action-icon">
+                    <a.icon size={18} />
                   </div>
-                  <h3>{a.title}</h3>
-                  <p>{a.desc}</p>
-                </Link>
-              ) : (
-                <div className="dash-action-card" key={a.title}>
-                  <div className="dash-action-top">
-                    <div className="dash-action-icon">
-                      <a.icon size={18} />
-                    </div>
-                    <span className="dash-soon">Coming soon</span>
-                  </div>
-                  <h3>{a.title}</h3>
-                  <p>{a.desc}</p>
                 </div>
-              )
-            )}
+                <h3>{a.title}</h3>
+                <p>{a.desc}</p>
+              </Link>
+            ))}
           </div>
         </main>
       </div>

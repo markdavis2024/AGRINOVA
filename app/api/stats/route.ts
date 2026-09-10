@@ -1,15 +1,47 @@
 import { NextResponse } from "next/server";
 
-export async function GET() {
-  // Return mock stats data for now
-  const stats = [
-    { key: "listings", label: "Total listings", value: "12", change: "+2 this week", icon: "Store", tone: "sky" },
-    { key: "active", label: "Active listings", value: "8", change: "4 available", icon: "Sprout", tone: "sky" },
-    { key: "orders", label: "Orders received", value: "5", change: "2 pending", icon: "Package", tone: "green" },
-    { key: "sales", label: "This month's sales", value: "245,000 FCFA", change: "+12%", icon: "Banknote", tone: "yellow" },
-    { key: "unread", label: "Messages", value: "3", change: "2 unread", icon: "MessageSquare", tone: "green" },
-    { key: "sensors", label: "Connected sensors", value: "2", change: "All active", icon: "Activity", tone: "sky" },
-  ];
+export async function GET(request: Request) {
+  try {
+    // In production, get session and return real stats based on role
+    // For now, return mock stats that work for all dashboards
 
-  return NextResponse.json({ stats });
+    return NextResponse.json({
+      stats: {
+        // Farmer stats
+        farmer: {
+          listings: 12,
+          active: 8,
+          orders: 5,
+          sales: "245,000 FCFA",
+          unread: 3,
+          sensors: 2,
+        },
+        // Buyer stats
+        buyer: {
+          placed: 8,
+          transit: 3,
+          farmers: 5,
+          spend: "185,000 FCFA",
+          unread: 2,
+          listings: 89,
+        },
+        // Agronomist stats
+        agronomist: {
+          conversations: 24,
+          unread: 5,
+          consultations: 12,
+          diagnosis: 8,
+          articles: 6,
+          credential: "Verified",
+          credentialStatus: "Approved",
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Stats error:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch stats" },
+      { status: 500 }
+    );
+  }
 }
