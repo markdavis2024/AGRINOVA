@@ -10,6 +10,7 @@ import {
   LogOut,
   Menu,
   Search,
+  Settings,
   X,
   Users,
   MapPin,
@@ -25,6 +26,7 @@ import {
   Phone,
   Mail,
   Star,
+  BookOpen,
 } from "lucide-react";
 import { useSession } from "@/lib/useSession";
 import NotificationBell from "@/components/NotificationBell";

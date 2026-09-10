@@ -5,45 +5,53 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Bell, ChevronDown, Layout, LogOut, Menu, Search, X,
-  Stethoscope, MapPin, Clock, AlertCircle, CheckCircle,
-  MessageCircle, Calendar, Users, BookOpen, Settings,
-  Filter, Image as ImageIcon, ArrowRight,
+  Calendar, Clock, Video, Phone, MapPin, CheckCircle, AlertCircle,
+  Users, MessageCircle, Stethoscope, BookOpen, Settings, Filter,
+  ArrowRight, Plus, User,
 } from "lucide-react";
 import { useSession } from "@/lib/useSession";
 import NotificationBell from "@/components/NotificationBell";
 
-interface DiagnosisRequest {
+interface Consultation {
   id: string;
   farmerName: string;
   farmerLocation: string;
   crop: string;
   issue: string;
-  images: number;
-  submitted: string;
-  status: "pending" | "in-progress" | "completed";
-  priority: "high" | "medium" | "low";
+  date: string;
+  time: string;
+  status: "pending" | "confirmed" | "completed" | "cancelled";
+  type: "video" | "phone" | "in-person";
 }
 
-const mockDiagnosis: DiagnosisRequest[] = [
-  { id: "1", farmerName: "Joseph Mbarga", farmerLocation: "Limbe", crop: "Plantains", issue: "Leaf yellowing and stunted growth", images: 3, submitted: "2024-03-20", status: "pending", priority: "high" },
-  { id: "2", farmerName: "Sylvie Ndam", farmerLocation: "Garoua", crop: "Groundnuts", issue: "Root rot", images: 2, submitted: "2024-03-19", status: "in-progress", priority: "medium" },
-  { id: "3", farmerName: "David Eto", farmerLocation: "Douala", crop: "Tomatoes", issue: "White spots on leaves", images: 4, submitted: "2024-03-18", status: "pending", priority: "high" },
-  { id: "4", farmerName: "Esther Ngo", farmerLocation: "Yaoundé", crop: "Cassava", issue: "Crop wilting", images: 2, submitted: "2024-03-17", status: "completed", priority: "medium" },
+const mockConsultations: Consultation[] = [
+  { id: "1", farmerName: "Jean Baptiste", farmerLocation: "Bamenda", crop: "Maize", issue: "Pest infestation", date: "2024-03-21", time: "10:00", status: "pending", type: "video" },
+  { id: "2", farmerName: "Marie Claire", farmerLocation: "Yaoundé", crop: "Tomatoes", issue: "Leaf disease", date: "2024-03-20", time: "14:30", status: "confirmed", type: "phone" },
+  { id: "3", farmerName: "Paul Atanga", farmerLocation: "Douala", crop: "Cassava", issue: "Soil fertility", date: "2024-03-19", time: "09:00", status: "completed", type: "in-person" },
+  { id: "4", farmerName: "Amina Ndongo", farmerLocation: "Buea", crop: "Cocoa", issue: "Pest control", date: "2024-03-22", time: "11:00", status: "pending", type: "video" },
 ];
 
-const priorityColors = {
-  high: { bg: "bg-red-50", text: "text-red-600", border: "border-red-200" },
-  medium: { bg: "bg-yellow-50", text: "text-yellow-600", border: "border-yellow-200" },
-  low: { bg: "bg-green-50", text: "text-green-600", border: "border-green-200" },
-};
-
 const statusColors = {
-  pending: { bg: "bg-yellow-50", text: "text-yellow-600", icon: Clock },
-  "in-progress": { bg: "bg-blue-50", text: "text-blue-600", icon: Stethoscope },
-  completed: { bg: "bg-green-50", text: "text-green-600", icon: CheckCircle },
+  pending: { bg: "bg-yellow-50", text: "text-yellow-600", border: "border-yellow-200", icon: Clock },
+  confirmed: { bg: "bg-blue-50", text: "text-blue-600", border: "border-blue-200", icon: CheckCircle },
+  completed: { bg: "bg-green-50", text: "text-green-600", border: "border-green-200", icon: CheckCircle },
+  cancelled: { bg: "bg-red-50", text: "text-red-600", border: "border-red-200", icon: AlertCircle },
 };
 
-export default function DiagnosisPage() {
+const statusLabels = {
+  pending: "Pending",
+  confirmed: "Confirmed",
+  completed: "Completed",
+  cancelled: "Cancelled",
+};
+
+const typeIcons = {
+  video: Video,
+  phone: Phone,
+  "in-person": MapPin,
+};
+
+export default function ConsultationsPage() {
   const router = useRouter();
   const { user, loading } = useSession("AGRONOMIST");
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -51,16 +59,16 @@ export default function DiagnosisPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("all");
 
-  if (loading || !user) return <div className="dash-loading">Loading diagnosis...</div>;
+  if (loading || !user) return <div className="dash-loading">Loading consultations...</div>;
 
   const initial = user.name.charAt(0).toUpperCase();
   const firstName = user.name.split(" ")[0];
 
-  const filteredDiagnosis = mockDiagnosis.filter(d => {
-    const matchesSearch = d.farmerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          d.crop.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          d.issue.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = filterStatus === "all" || d.status === filterStatus;
+  const filteredConsultations = mockConsultations.filter(c => {
+    const matchesSearch = c.farmerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          c.crop.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          c.issue.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = filterStatus === "all" || c.status === filterStatus;
     return matchesSearch && matchesStatus;
   });
 
@@ -78,8 +86,8 @@ export default function DiagnosisPage() {
             { label: "Dashboard", icon: Layout, href: "/agronomist" },
             { label: "My Farmers", icon: Users, href: "/agronomist/farmers" },
             { label: "Questions", icon: MessageCircle, href: "/messages" },
-            { label: "Consultations", icon: Calendar, href: "/agronomist/consultations" },
-            { label: "Diagnosis", icon: Stethoscope, href: "/agronomist/diagnosis", active: true },
+            { label: "Consultations", icon: Calendar, href: "/agronomist/consultations", active: true },
+            { label: "Diagnosis", icon: Stethoscope, href: "/agronomist/diagnosis" },
             { label: "Articles", icon: BookOpen, href: "/agronomist/articles" },
             { label: "Settings", icon: Settings, href: "/settings" },
           ].map((item) => (
@@ -96,7 +104,7 @@ export default function DiagnosisPage() {
       <div className="dash-main">
         <header className="dash-topbar">
           <button className="dash-menu-btn" onClick={() => setSidebarOpen(true)}><Menu size={22} /></button>
-          <div className="dash-search"><Search size={16} /><input type="text" placeholder="Search diagnosis requests..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /></div>
+          <div className="dash-search"><Search size={16} /><input type="text" placeholder="Search consultations..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /></div>
           <div className="dash-topbar-actions">
             <NotificationBell userId={user.id} />
             <div className="dash-profile">
@@ -115,50 +123,47 @@ export default function DiagnosisPage() {
 
         <main className="dash-content">
           <div className="dash-page-header">
-            <div><h1>Diagnosis Requests</h1><p>Review and respond to crop diagnosis requests</p></div>
+            <div><h1>Consultations</h1><p>Manage your consultation sessions with farmers</p></div>
+            <Link href="/agronomist/consultations/new" className="dash-primary-btn"><Plus size={16} /> New Consultation</Link>
           </div>
 
           <div className="dash-filters">
             <button className={`dash-filter-btn ${filterStatus === "all" ? "dash-filter-active" : ""}`} onClick={() => setFilterStatus("all")}>All</button>
             <button className={`dash-filter-btn ${filterStatus === "pending" ? "dash-filter-active" : ""}`} onClick={() => setFilterStatus("pending")}>Pending</button>
-            <button className={`dash-filter-btn ${filterStatus === "in-progress" ? "dash-filter-active" : ""}`} onClick={() => setFilterStatus("in-progress")}>In Progress</button>
+            <button className={`dash-filter-btn ${filterStatus === "confirmed" ? "dash-filter-active" : ""}`} onClick={() => setFilterStatus("confirmed")}>Confirmed</button>
             <button className={`dash-filter-btn ${filterStatus === "completed" ? "dash-filter-active" : ""}`} onClick={() => setFilterStatus("completed")}>Completed</button>
           </div>
 
-          <div className="dash-diagnosis-grid">
-            {filteredDiagnosis.map((d) => {
-              const statusColor = statusColors[d.status];
+          <div className="dash-consultations-list">
+            {filteredConsultations.map((c) => {
+              const statusColor = statusColors[c.status];
               const StatusIcon = statusColor.icon;
-              const priorityColor = priorityColors[d.priority];
+              const TypeIcon = typeIcons[c.type];
               return (
-                <div key={d.id} className="dash-diagnosis-card">
-                  <div className="dash-diagnosis-header">
-                    <div className="dash-diagnosis-user">
-                      <div className="dash-diagnosis-avatar"><span>{d.farmerName.charAt(0)}</span></div>
+                <div key={c.id} className="dash-consultation-item">
+                  <div className="dash-consultation-header">
+                    <div className="dash-consultation-user">
+                      <div className="dash-consultation-avatar"><span>{c.farmerName.charAt(0)}</span></div>
                       <div>
-                        <h3>{d.farmerName}</h3>
-                        <span><MapPin size={12} />{d.farmerLocation}</span>
+                        <h3>{c.farmerName}</h3>
+                        <span><MapPin size={12} />{c.farmerLocation}</span>
                       </div>
                     </div>
-                    <div className={`dash-diagnosis-priority ${priorityColor.bg} ${priorityColor.text}`}>
-                      {d.priority.charAt(0).toUpperCase() + d.priority.slice(1)}
+                    <div className={`dash-consultation-status ${statusColor.bg} ${statusColor.text}`}>
+                      <StatusIcon size={14} /><span>{statusLabels[c.status]}</span>
                     </div>
                   </div>
-                  <div className="dash-diagnosis-body">
-                    <span className="dash-diagnosis-crop">{d.crop}</span>
-                    <p className="dash-diagnosis-issue">{d.issue}</p>
-                    <div className="dash-diagnosis-meta">
-                      <span><ImageIcon size={14} /> {d.images} images</span>
-                      <span><Clock size={14} /> {d.submitted}</span>
+                  <div className="dash-consultation-body">
+                    <div className="dash-consultation-details">
+                      <span><Calendar size={14} /> {c.date}</span>
+                      <span><Clock size={14} /> {c.time}</span>
+                      <span><TypeIcon size={14} /> {c.type}</span>
                     </div>
+                    <div className="dash-consultation-crop"><strong>{c.crop}</strong> - {c.issue}</div>
                   </div>
-                  <div className="dash-diagnosis-footer">
-                    <div className={`dash-diagnosis-status ${statusColor.bg} ${statusColor.text}`}>
-                      <StatusIcon size={14} /><span>{d.status === "in-progress" ? "In Progress" : d.status.charAt(0).toUpperCase() + d.status.slice(1)}</span>
-                    </div>
-                    <Link href={`/agronomist/diagnosis/${d.id}`} className="dash-diagnosis-review-btn">
-                      Review <ArrowRight size={14} />
-                    </Link>
+                  <div className="dash-consultation-actions">
+                    <button className="dash-consultation-join-btn">Join Session</button>
+                    <button className="dash-consultation-reschedule-btn">Reschedule</button>
                   </div>
                 </div>
               );
@@ -205,32 +210,34 @@ export default function DiagnosisPage() {
         .dash-profile-menu-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.625rem 1rem; color: #6b7280; text-decoration: none; font-size: 0.875rem; width: 100%; border: none; background: none; cursor: pointer; font-family: inherit; }
         .dash-profile-menu-item:hover { background: #f5f0e8; color: #2d5a27; }
         .dash-content { flex: 1; padding: 1.5rem; overflow-y: auto; max-width: 1200px; margin: 0 auto; width: 100%; }
-        .dash-page-header { margin-bottom: 1.5rem; }
+        .dash-page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 0.5rem; }
         .dash-page-header h1 { font-size: 1.5rem; font-weight: 700; color: #2d5a27; }
         .dash-page-header p { color: #6b7280; font-size: 0.875rem; }
+        .dash-primary-btn { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1.25rem; background: #7cb342; color: white; border-radius: 0.5rem; font-size: 0.875rem; font-weight: 500; text-decoration: none; }
+        .dash-primary-btn:hover { background: #558b2f; }
         .dash-filters { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
-        .dash-filter-btn { padding: 0.375rem 0.75rem; border: 1px solid #e8e0d5; border-radius: 9999px; font-size: 0.75rem; color: #6b7280; background: #faf8f5; cursor: pointer; font-family: inherit; }
+        .dash-filter-btn { padding: 0.375rem 0.75rem; border: 1px solid #e8e0d5; border-radius: 9999px; font-size: 0.75rem; color: #6b7280; background: #faf8f5; cursor: pointer; transition: all 0.2s; font-family: inherit; }
         .dash-filter-btn:hover { border-color: #7cb342; color: #2d5a27; }
         .dash-filter-active { background: #7cb342; color: white; border-color: #7cb342; }
-        .dash-diagnosis-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1rem; }
-        .dash-diagnosis-card { background: #faf8f5; border: 1px solid #e8e0d5; border-radius: 1rem; padding: 1rem; transition: all 0.2s; }
-        .dash-diagnosis-card:hover { border-color: #7cb342; }
-        .dash-diagnosis-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem; }
-        .dash-diagnosis-user { display: flex; align-items: center; gap: 0.75rem; }
-        .dash-diagnosis-avatar { width: 2.5rem; height: 2.5rem; background: linear-gradient(135deg, #7cb342, #558b2f); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.875rem; font-weight: 600; color: white; }
-        .dash-diagnosis-user h3 { font-size: 0.875rem; font-weight: 600; color: #2d5a27; margin: 0; }
-        .dash-diagnosis-user span { display: flex; align-items: center; gap: 0.25rem; font-size: 0.7rem; color: #6b7280; }
-        .dash-diagnosis-priority { padding: 0.125rem 0.5rem; border-radius: 9999px; font-size: 0.6rem; font-weight: 500; }
-        .dash-diagnosis-body { margin-bottom: 0.75rem; }
-        .dash-diagnosis-crop { display: inline-block; font-size: 0.65rem; color: #7cb342; background: #e8f5e9; padding: 0.125rem 0.5rem; border-radius: 9999px; margin-bottom: 0.25rem; }
-        .dash-diagnosis-issue { font-size: 0.75rem; color: #2d5a27; margin: 0.25rem 0; }
-        .dash-diagnosis-meta { display: flex; gap: 0.75rem; font-size: 0.65rem; color: #6b7280; }
-        .dash-diagnosis-meta span { display: flex; align-items: center; gap: 0.25rem; }
-        .dash-diagnosis-footer { display: flex; justify-content: space-between; align-items: center; }
-        .dash-diagnosis-status { display: flex; align-items: center; gap: 0.25rem; padding: 0.125rem 0.5rem; border-radius: 9999px; font-size: 0.6rem; font-weight: 500; }
-        .dash-diagnosis-review-btn { display: flex; align-items: center; gap: 0.25rem; font-size: 0.7rem; color: #7cb342; text-decoration: none; font-weight: 500; }
-        .dash-diagnosis-review-btn:hover { text-decoration: underline; }
-        @media (max-width: 768px) { .dash-content { padding: 1rem; } .dash-diagnosis-grid { grid-template-columns: 1fr; } }
+        .dash-consultations-list { display: flex; flex-direction: column; gap: 0.75rem; }
+        .dash-consultation-item { background: #faf8f5; border: 1px solid #e8e0d5; border-radius: 1rem; padding: 1rem; transition: all 0.2s; }
+        .dash-consultation-item:hover { border-color: #7cb342; }
+        .dash-consultation-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem; }
+        .dash-consultation-user { display: flex; align-items: center; gap: 0.75rem; }
+        .dash-consultation-avatar { width: 2.5rem; height: 2.5rem; background: linear-gradient(135deg, #7cb342, #558b2f); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.875rem; font-weight: 600; color: white; }
+        .dash-consultation-user h3 { font-size: 0.875rem; font-weight: 600; color: #2d5a27; margin: 0; }
+        .dash-consultation-user span { display: flex; align-items: center; gap: 0.25rem; font-size: 0.7rem; color: #6b7280; }
+        .dash-consultation-status { display: flex; align-items: center; gap: 0.25rem; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.65rem; font-weight: 500; }
+        .dash-consultation-body { margin-bottom: 0.75rem; }
+        .dash-consultation-details { display: flex; gap: 1rem; margin-bottom: 0.5rem; flex-wrap: wrap; }
+        .dash-consultation-details span { display: flex; align-items: center; gap: 0.25rem; font-size: 0.7rem; color: #6b7280; }
+        .dash-consultation-crop { font-size: 0.75rem; color: #2d5a27; }
+        .dash-consultation-actions { display: flex; gap: 0.5rem; }
+        .dash-consultation-join-btn { padding: 0.375rem 0.75rem; background: #7cb342; color: white; border: none; border-radius: 0.5rem; font-size: 0.7rem; font-weight: 500; cursor: pointer; font-family: inherit; }
+        .dash-consultation-join-btn:hover { background: #558b2f; }
+        .dash-consultation-reschedule-btn { padding: 0.375rem 0.75rem; background: #f5f0e8; color: #6b7280; border: 1px solid #e8e0d5; border-radius: 0.5rem; font-size: 0.7rem; font-weight: 500; cursor: pointer; font-family: inherit; }
+        .dash-consultation-reschedule-btn:hover { border-color: #7cb342; color: #2d5a27; }
+        @media (max-width: 768px) { .dash-content { padding: 1rem; } .dash-consultation-header { flex-direction: column; } }
       `}</style>
     </div>
   );
