@@ -4,8 +4,10 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
+// ============ ENUMS ============
 enum Role {
   FARMER
   BUYER
@@ -13,329 +15,324 @@ enum Role {
   ADMIN
 }
 
-enum ListingStatus {
-  ACTIVE
-  SOLD_OUT
-}
-
 enum OrderStatus {
   PENDING
   CONFIRMED
+  SHIPPED
   DELIVERED
   CANCELLED
 }
 
-enum DeviceType {
-  SOIL_MOISTURE
-  WEATHER_STATION
-  TEMPERATURE_HUMIDITY
-  WATER_LEVEL
-  PH_SENSOR
-  NPK_SENSOR
-  RAIN_GAUGE
-  WIND_SPEED
-  LIGHT_SENSOR
-  OTHER
+enum ConsultType {
+  VIDEO
+  PHONE
+  IN_PERSON
 }
 
-enum ReadingType {
-  SOIL_MOISTURE
-  SOIL_TEMPERATURE
-  SOIL_PH
-  SOIL_NPK
-  AIR_TEMPERATURE
-  AIR_HUMIDITY
-  RAINFALL
-  WIND_SPEED
-  LIGHT_INTENSITY
-  WATER_LEVEL
-  PRESSURE
-  OTHER
-}
-
-enum ConsultationStatus {
+enum ConsultStatus {
   PENDING
   CONFIRMED
   COMPLETED
   CANCELLED
 }
 
-enum DiagnosisStatus {
-  PENDING
-  ANSWERED
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
 }
 
+enum DiagnosisStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum CredentialStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// ============ USER ============
 model User {
-  id        Int      @id @default(autoincrement())
-  name      String
-  email     String   @unique
-  phone     String?
-  password  String
-  role      Role
-  photo     String?
+  id               String   @id @default(cuid())
+  email            String   @unique
+  passwordHash     String
+  name             String?
+  phone            String?
+  role             Role
+  region           String?
+  town             String?
+  photoUrl         String?
+  verified         Boolean  @default(false)
+  emailVerified    Boolean  @default(false)
+  twoFactorSecret  String?
+  twoFactorEnabled Boolean  @default(false)
+  iotInterest      Boolean  @default(false)
+
+  farmer       Farmer?
+  buyer        Buyer?
+  agronomist   Agronomist?
+  sentMessages Message[]  @relation("SentMessages")
+  notifications Notification[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Shared location fields
-  region String?
-  town   String?
-
-  // Farmer-specific
-  farmingType String?
-  farmSize    String?
-  twoFactor   Boolean @default(false)
-  iotInterest Boolean @default(false)
-  idFrontUrl    String?
-  idBackUrl     String?
-  farmProofUrl  String?
-
-  // TWO-FACTOR AUTHENTICATION FIELDS
-  twoFactorEnabled   Boolean  @default(false)
-  twoFactorSecret    String?
-  twoFactorBackupCodes String?
-  twoFactorVerified  Boolean  @default(false)
-
-  // Buyer-specific
-  interests String[] @default([])
-
-  // Agronomist-specific
-  specialization    String?
-  experience        String?
-  institution       String?
-  certificationUrl  String?
-
-  // Admin-specific
-  position      String?
-  organization  String?
-  inviteCode    String?
-  authLetterUrl String?
-
-  // Account status
-  verified  Boolean @default(true)
-  suspended Boolean @default(false)
-
-  // Relations
-  listings Listing[]
-  devices  Device[]
-  orders   Order[]  @relation("BuyerOrders")
-  alerts   Alert[]
-  notifications Notification[]  // ← ADD THIS LINE
-
-  sentMessages     Message[] @relation("SentMessages")
-  receivedMessages Message[] @relation("ReceivedMessages")
-
-  consultationsAsFarmer     Consultation[] @relation("FarmerConsultations")
-  consultationsAsAgronomist Consultation[] @relation("AgronomistConsultations")
-  diagnosesAsFarmer         Diagnosis[]    @relation("FarmerDiagnoses")
-  diagnosesAsAgronomist     Diagnosis[]    @relation("AgronomistDiagnoses")
-  articles                  Article[]
-  farms                     Farm[]
+  @@index([role])
+  @@index([email])
 }
 
-model Listing {
-  id          Int           @id @default(autoincrement())
-  title       String
-  category    String
-  description String
-  price       Int
-  unit        String
-  quantity    String
-  imageUrl    String?
-  status      ListingStatus @default(ACTIVE)
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+// ============ ROLE PROFILES ============
+model Farmer {
+  id           String  @id @default(cuid())
+  userId       String  @unique
+  user         User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  farmingType  String?
+  farmSize     String?
+  idFrontUrl   String?
+  idBackUrl    String?
+  farmProofUrl String?
 
-  farmer   User @relation(fields: [farmerId], references: [id], onDelete: Cascade)
-  farmerId Int
+  listings      Listing[]
+  orders        Order[]        @relation("FarmerOrders")
+  devices       Device[]
+  consultations Consultation[]
+  diagnoses     Diagnosis[]
+  savedBy       SavedFarmer[]
+
+  createdAt DateTime @default(now())
+}
+
+model Buyer {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companyName       String?
+  companyType       String?
+  preferredProducts String[]
+
+  orders       Order[]       @relation("BuyerOrders")
+  savedFarmers SavedFarmer[]
+
+  createdAt DateTime @default(now())
+}
+
+model Agronomist {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  specialization  String?
+  experience      String?
+  institution     String?
+  certificateUrl  String?
+  credentialStatus CredentialStatus @default(PENDING)
+  rating          Float    @default(0)
+  reviewCount     Int      @default(0)
+  pricePerSession Int      @default(0)
+  languages       String[]
+  bio             String?
+
+  consultations Consultation[]
+  diagnoses     Diagnosis[]
+  articles      Article[]
+
+  createdAt DateTime @default(now())
+}
+
+// ============ MARKETPLACE ============
+model Listing {
+  id          String   @id @default(cuid())
+  farmerId    String
+  farmer      Farmer   @relation(fields: [farmerId], references: [id], onDelete: Cascade)
+  name        String
+  category    String
+  price       Float
+  unit        String   @default("kg")
+  quantity    Int
+  imageUrl    String?
+  description String?
+  available   Boolean  @default(true)
 
   orders Order[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([category])
+  @@index([available])
 }
 
 model Order {
-  id           Int         @id @default(autoincrement())
+  id           String      @id @default(cuid())
+  buyerId      String
+  buyer        Buyer       @relation("BuyerOrders", fields: [buyerId], references: [id])
+  farmerId     String
+  farmer       Farmer      @relation("FarmerOrders", fields: [farmerId], references: [id])
+  listingId    String
+  listing      Listing     @relation(fields: [listingId], references: [id])
   quantity     Int
-  totalPrice   Int
+  totalPrice   Float
   status       OrderStatus @default(PENDING)
-  note         String?
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
+  deliveryType String?
+  notes        String?
 
-  listing   Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
-  listingId Int
-
-  buyer   User @relation("BuyerOrders", fields: [buyerId], references: [id], onDelete: Cascade)
-  buyerId Int
-}
-
-model Device {
-  id            Int        @id @default(autoincrement())
-  name          String
-  type          DeviceType
-  location      String?
-  farmId        Int?
-  active        Boolean    @default(true)
-  deviceKey     String     @unique
-  lastReading   DateTime?
-  minThreshold  Float?
-  maxThreshold  Float?
-  alertEnabled  Boolean    @default(true)
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
-
-  farmer   User @relation(fields: [farmerId], references: [id], onDelete: Cascade)
-  farmerId Int
-  farm     Farm? @relation(fields: [farmId], references: [id])
-
-  readings Reading[]
-  alerts   Alert[]
-}
-
-model Reading {
-  id          Int        @id @default(autoincrement())
-  value       Float
-  unit        String
-  type        ReadingType
-  timestamp   DateTime   @default(now())
-  latitude    Float?
-  longitude   Float?
-
-  device   Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
-  deviceId Int
-
-  @@index([deviceId, timestamp])
-  @@index([timestamp])
-}
-
-model Alert {
-  id          Int      @id @default(autoincrement())
-  message     String
-  severity    String
-  read        Boolean  @default(false)
-  createdAt   DateTime @default(now())
-
-  device   Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
-  deviceId Int
-  farmer   User   @relation(fields: [farmerId], references: [id], onDelete: Cascade)
-  farmerId Int
-}
-
-model Message {
-  id        Int      @id @default(autoincrement())
-  content   String
-  read      Boolean  @default(false)
-  createdAt DateTime @default(now())
-
-  sender     User @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
-  senderId   Int
-  receiver   User @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
-  receiverId Int
-
-  @@index([senderId, receiverId])
-}
-
-model Consultation {
-  id          Int                @id @default(autoincrement())
-  subject     String
-  notes       String?
-  status      ConsultationStatus @default(PENDING)
-  scheduledAt DateTime?
-  createdAt   DateTime           @default(now())
-  updatedAt   DateTime           @updatedAt
-
-  farmer       User @relation("FarmerConsultations", fields: [farmerId], references: [id], onDelete: Cascade)
-  farmerId     Int
-  agronomist   User? @relation("AgronomistConsultations", fields: [agronomistId], references: [id], onDelete: SetNull)
-  agronomistId Int?
-}
-
-model Diagnosis {
-  id            Int             @id @default(autoincrement())
-  cropName      String
-  description   String
-  imageUrl      String?
-  voiceNoteUrl  String?
-  response      String?
-  aiSuggestion  String?
-  status        DiagnosisStatus @default(PENDING)
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
-
-  farmer       User  @relation("FarmerDiagnoses", fields: [farmerId], references: [id], onDelete: Cascade)
-  farmerId     Int
-  agronomist   User? @relation("AgronomistDiagnoses", fields: [agronomistId], references: [id], onDelete: SetNull)
-  agronomistId Int?
-}
-
-model Article {
-  id        Int      @id @default(autoincrement())
-  title     String
-  category  String
-  content   String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  author   User @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  authorId Int
+  @@index([status])
 }
 
-model Farm {
-  id          Int      @id @default(autoincrement())
-  name        String
-  farmingType String
-  size        String?
-  region      String?
-  town        String?
-  description String?
-  latitude    Float?
-  longitude   Float?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+model SavedFarmer {
+  id       String @id @default(cuid())
+  buyerId  String
+  buyer    Buyer  @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  farmerId String
+  farmer   Farmer @relation(fields: [farmerId], references: [id], onDelete: Cascade)
 
-  farmer   User     @relation(fields: [farmerId], references: [id], onDelete: Cascade)
-  farmerId Int
-  devices  Device[]
+  @@unique([buyerId, farmerId])
+}
+
+// ============ AGRONOMY ============
+model Consultation {
+  id           String        @id @default(cuid())
+  farmerId     String
+  farmer       Farmer        @relation(fields: [farmerId], references: [id], onDelete: Cascade)
+  agronomistId String?
+  agronomist   Agronomist?   @relation(fields: [agronomistId], references: [id])
+  date         DateTime
+  time         String
+  type         ConsultType
+  status       ConsultStatus @default(PENDING)
+  notes        String?
+  price        Float         @default(0)
+
+  createdAt DateTime @default(now())
+
+  @@index([status])
+}
+
+model Diagnosis {
+  id           String          @id @default(cuid())
+  farmerId     String
+  farmer       Farmer          @relation(fields: [farmerId], references: [id], onDelete: Cascade)
+  agronomistId String?
+  agronomist   Agronomist?     @relation(fields: [agronomistId], references: [id])
+  crop         String
+  issue        String
+  images       String[]
+  priority     Priority        @default(MEDIUM)
+  status       DiagnosisStatus @default(PENDING)
+  reply        String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+}
+
+model Article {
+  id        String     @id @default(cuid())
+  authorId  String
+  author    Agronomist @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  title     String
+  category  String
+  excerpt   String
+  content   String
+  published Boolean    @default(false)
+  views     Int        @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([published])
+}
+
+// ============ IOT ============
+model Device {
+  id        String   @id @default(cuid())
+  farmerId  String
+  farmer    Farmer   @relation(fields: [farmerId], references: [id], onDelete: Cascade)
+  name      String
+  type      String
+  active    Boolean  @default(true)
+  lastReading Json?
+
+  createdAt DateTime @default(now())
+}
+
+// ============ MESSAGING ============
+model Conversation {
+  id           String    @id @default(cuid())
+  participantA String
+  participantB String
+  lastMessage  String?
+  lastAt       DateTime?
+
+  messages Message[]
+
+  createdAt DateTime @default(now())
+
+  @@unique([participantA, participantB])
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  sender         User         @relation("SentMessages", fields: [senderId], references: [id])
+  content        String
+  read           Boolean      @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@index([conversationId])
+}
+
+// ============ NOTIFICATIONS & SETTINGS ============
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  title     String
+  body      String?
+  link      String?
+  read      Boolean  @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, read])
 }
 
 model PlatformSettings {
-  id                  Int      @id @default(1)
-  siteName            String   @default("AGRINOVA")
+  id                  Int     @id @default(1)
+  siteName            String  @default("AGRINOVA")
   supportEmail        String?
-  supportPhone        String?
-  allowRegistrations  Boolean  @default(true)
-  requireVerification Boolean  @default(true)
-  maintenanceMode     Boolean  @default(false)
+  allowRegistrations  Boolean @default(true)
+  requireVerification Boolean @default(true)
+  maintenanceMode     Boolean @default(false)
   announcement        String?
-  updatedAt           DateTime @updatedAt
 }
 
 model PasswordReset {
-  id        Int      @id @default(autoincrement())
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  used      Boolean  @default(false)
+
+  createdAt DateTime @default(now())
+}
+
+model EmailVerification {
+  id        String   @id @default(cuid())
   email     String
   token     String   @unique
   expiresAt DateTime
   used      Boolean  @default(false)
+
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([email])
-  @@index([token])
-}
-
-// ✅ ADD THIS MODEL
-model Notification {
-  id        Int      @id @default(autoincrement())
-  userId    Int
-  title     String
-  message   String
-  type      String   @default("info")
-  link      String?
-  metadata  Json?
-  read      Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([userId, read])
 }
