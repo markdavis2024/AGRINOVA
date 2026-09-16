@@ -148,30 +148,38 @@ export default function FarmerRegisterPage() {
     setIsValidatingEmail(true);
     setEmailError("");
 
-    try {
-      const response = await fetch("/api/auth/validate-email", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
+  try {
+  const response = await fetch("/api/v1/auth/validate-email", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
 
-      const data = await response.json();
+  // Guard against HTML/404/500 — never crash on .json()
+  const ct = response.headers.get("content-type") || "";
+  if (!response.ok || !ct.includes("application/json")) {
+    // Fail open — don't block the user if server is unhappy
+    setEmailValid(true);
+    setEmailError("");
+    return;
+  }
 
-      if (data.valid === false) {
-        setEmailValid(false);
-        setEmailError(data.error || "Invalid email address.");
-      } else {
-        setEmailValid(true);
-        setEmailError("");
-      }
-    } catch (error) {
-      console.error("Email validation error:", error);
-      setEmailValid(true);
-      setEmailError("");
-    } finally {
-      setIsValidatingEmail(false);
-    }
-  };
+  const data = await response.json();
+
+  if (data.valid === false) {
+    setEmailValid(false);
+    setEmailError(data.error || "Invalid email address.");
+  } else {
+    setEmailValid(true);
+    setEmailError("");
+  }
+} catch (error) {
+  console.error("Email validation error:", error);
+  setEmailValid(true);
+  setEmailError("");
+} finally {
+  setIsValidatingEmail(false);
+};
 
   // Debounced email validation
   useEffect(() => {

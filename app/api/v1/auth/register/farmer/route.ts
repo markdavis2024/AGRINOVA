@@ -132,7 +132,7 @@ export async function POST(req: NextRequest) {
     // ---- Create user + farmer in one transaction ----
     const passwordHash = await hashPassword(password!);
 
-    const user = await prisma.user.create({
+    const user = await (prisma as any).user.create({
       data: {
         email: email!,
         passwordHash,
