@@ -1,105 +1,93 @@
-import { writeFile, mkdir } from "fs/promises";
+import { mkdir, writeFile } from "fs/promises";
 import path from "path";
+import { randomUUID } from "crypto";
 import sharp from "sharp";
 
-export class UploadError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "UploadError";
-  }
+const UPLOAD_ROOT = path.join(process.cwd(), "public", "uploads");
+
+const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const ALLOWED_DOC_TYPES = ["application/pdf"];
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;  // 5MB
+const MAX_DOC_BYTES   = 10 * 1024 * 1024; // 10MB
+
+export interface SavedFile {
+  url: string;      // public path e.g. /uploads/profiles/abc.jpg
+  filename: string;
+  size: number;
+  mimeType: string;
 }
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-const ALLOWED_TYPES = [
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "image/heic",
-  "image/heif",
-  "application/pdf",
-  "audio/webm",
-  "audio/mp3",
-  "audio/mpeg",
-  "audio/ogg",
-  "audio/wav",
-];
-
-// Profile photo settings
-const PROFILE_MAX_WIDTH = 500;
-const PROFILE_MAX_HEIGHT = 500;
-const PROFILE_QUALITY = 80;
-
+/**
+ * Save an uploaded file to /public/uploads/<folder>/<uuid>.<ext>
+ * - Images are re-encoded with sharp → compressed JPEG
+ * - PDFs are saved as-is
+ * - Everything else is rejected
+ */
 export async function saveUpload(
   file: File,
-  folder: string,
-  options?: { resize?: boolean; maxWidth?: number; maxHeight?: number }
-): Promise<string> {
-  try {
-    if (!file || !file.name) {
-      throw new UploadError("No file provided.");
-    }
-
-    if (file.size > MAX_FILE_SIZE) {
-      throw new UploadError(`File size exceeds ${MAX_FILE_SIZE / 1024 / 1024}MB limit.`);
-    }
-
-    if (!ALLOWED_TYPES.includes(file.type)) {
-      throw new UploadError("Only JPG, PNG, WebP, PDF, and audio files are allowed.");
-    }
-
-    const timestamp = Date.now();
-    const random = Math.random().toString(36).substring(2, 10);
-    const extension = file.name.split(".").pop() ||
-      (file.type.startsWith("audio/") ? "webm" : "jpg");
-    let filename = `${timestamp}-${random}.${extension}`;
-
-    const uploadDir = path.join(process.cwd(), "public", "uploads", folder);
-    await mkdir(uploadDir, { recursive: true });
-
-    const filePath = path.join(uploadDir, filename);
-    const bytes = await file.arrayBuffer();
-    let buffer = Buffer.from(bytes);
-
-    // Handle image resizing for profile photos
-    if (
-      folder === "profiles" &&
-      file.type.startsWith("image/") &&
-      options?.resize !== false
-    ) {
-      try {
-        const maxWidth = options?.maxWidth || PROFILE_MAX_WIDTH;
-        const maxHeight = options?.maxHeight || PROFILE_MAX_HEIGHT;
-
-        const image = sharp(buffer);
-        const metadata = await image.metadata();
-
-        if (
-          (metadata.width && metadata.width > maxWidth) ||
-          (metadata.height && metadata.height > maxHeight)
-        ) {
-          buffer = await image
-            .resize(maxWidth, maxHeight, {
-              fit: "inside",
-              withoutEnlargement: true,
-            })
-            .jpeg({ quality: PROFILE_QUALITY })
-            .toBuffer();
-
-          filename = `${timestamp}-${random}.jpg`;
-        }
-      } catch (sharpError) {
-        console.warn("Image processing failed, using original:", sharpError);
-      }
-    }
-
-    await writeFile(path.join(uploadDir, filename), buffer);
-
-    return `/uploads/${folder}/${filename}`;
-  } catch (error) {
-    if (error instanceof UploadError) {
-      throw error;
-    }
-    console.error("Upload error:", error);
-    throw new UploadError("Failed to save file. Please try again.");
+  folder: string
+): Promise<SavedFile> {
+  if (!file || file.size === 0) {
+    throw new Error("Empty file");
   }
+
+  const isImage = ALLOWED_IMAGE_TYPES.includes(file.type);
+  const isPdf = ALLOWED_DOC_TYPES.includes(file.type);
+
+  if (!isImage && !isPdf) {
+    throw new Error(`Unsupported file type: ${file.type}`);
+  }
+
+  const max = isImage ? MAX_IMAGE_BYTES : MAX_DOC_BYTES;
+  if (file.size > max) {
+    throw new Error(`File too large (max ${max / 1024 / 1024}MB)`);
+  }
+
+  const dir = path.join(UPLOAD_ROOT, folder);
+  await mkdir(dir, { recursive: true });
+
+  const id = randomUUID();
+  const arrayBuffer = await file.arrayBuffer();
+  const inputBuffer = Buffer.from(arrayBuffer);
+
+  let outputBuffer: Buffer;
+  let ext: string;
+
+  if (isImage) {
+    outputBuffer = await sharp(inputBuffer)
+      .resize({ width: 1400, withoutEnlargement: true })
+      .jpeg({ quality: 85 })
+      .toBuffer();
+    ext = "jpg";
+  } else {
+    outputBuffer = inputBuffer;
+    ext = "pdf";
+  }
+
+  const filename = `${id}.${ext}`;
+  const fullPath = path.join(dir, filename);
+  await writeFile(fullPath, outputBuffer);
+
+  return {
+    url: `/uploads/${folder}/${filename}`,
+    filename,
+    size: outputBuffer.length,
+    mimeType: isImage ? "image/jpeg" : "application/pdf",
+  };
+}
+
+/**
+ * Save multiple files, returns array of saved metadata.
+ * Silently skips null/undefined files.
+ */
+export async function saveUploads(
+  files: { key: string; file: File | null }[],
+  folder: string
+): Promise<Record<string, SavedFile>> {
+  const out: Record<string, SavedFile> = {};
+  for (const { key, file } of files) {
+    if (!file || file.size === 0) continue;
+    out[key] = await saveUpload(file, folder);
+  }
+  return out;
 }
