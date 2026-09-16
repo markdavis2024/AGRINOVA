@@ -179,7 +179,8 @@ export default function FarmerRegisterPage() {
   setEmailError("");
 } finally {
   setIsValidatingEmail(false);
-};
+}
+  };
 
   // Debounced email validation
   useEffect(() => {
